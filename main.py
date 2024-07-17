@@ -6,6 +6,7 @@ from utils.face_detection import FaceMeshDetector
 from utils.hands_detection import HandDetector
 from rig.rig_mapper import map_landmarks_to_rig
 from rig.animator import animate_rig
+from data.landmark_structure import landmarks
 
 
 # Initialize detectors
