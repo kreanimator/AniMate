@@ -9,7 +9,6 @@ from rig.animator import animate_rig
 from data.landmark_structure import landmarks
 import time
 
-
 # Initialize detectors
 pose_detector = PoseDetector()
 face_detector = FaceMeshDetector()
