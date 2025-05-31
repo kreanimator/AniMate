@@ -1,11 +1,9 @@
-__author__ = "Valentin Bakin"
-
 import cv2
 import mediapipe as mp
 import numpy as np
 import time
 
-class DetectionTest:
+class MotionCapture:
     def __init__(self):
         # Initialize MediaPipe solutions
         self.mp_pose = mp.solutions.pose
@@ -32,25 +30,29 @@ class DetectionTest:
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5
         )
-
+        
+        # Store previous landmark positions for visualization
+        self.previous_landmarks = None
+        
         # Detection flags
         self.detection_flags = {
             'pose': True,
             'face': True,
             'hands': True
         }
-
+        
     def process_frame(self, frame):
-        # Convert to RGB
+        # Convert BGR to RGB
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
-        # Process with enabled detectors
         results = {
             'pose': None,
             'face': None,
-            'hands': None
+            'hands': None,
+            'pose_landmarks': None
         }
         
+        # Process with enabled detectors
         if self.detection_flags['pose']:
             results['pose'] = self.pose.process(rgb_frame)
             if results['pose'].pose_landmarks:
@@ -60,6 +62,15 @@ class DetectionTest:
                     self.mp_pose.POSE_CONNECTIONS,
                     landmark_drawing_spec=self.mp_draw.DrawingSpec(color=(255,0,0))
                 )
+                
+                # Store landmarks for movement vectors
+                if self.previous_landmarks:
+                    self.draw_movement_vectors(frame, results['pose'].pose_landmarks)
+                self.previous_landmarks = results['pose'].pose_landmarks
+                
+                # Calculate and draw angles
+                self.draw_joint_angles(frame, results['pose'].pose_landmarks)
+                results['pose_landmarks'] = results['pose'].pose_landmarks
         
         if self.detection_flags['face']:
             results['face'] = self.face_mesh.process(rgb_frame)
@@ -85,17 +96,68 @@ class DetectionTest:
                     )
         
         return frame, results
+    
+    def draw_movement_vectors(self, frame, current_landmarks):
+        h, w, _ = frame.shape
+        for i, (curr, prev) in enumerate(zip(current_landmarks.landmark, 
+                                           self.previous_landmarks.landmark)):
+            # Convert normalized coordinates to pixel coordinates
+            cx, cy = int(curr.x * w), int(curr.y * h)
+            px, py = int(prev.x * w), int(prev.y * h)
+            
+            # Draw movement vector if significant movement detected
+            if abs(cx - px) > 2 or abs(cy - py) > 2:
+                cv2.arrowedLine(frame, (px, py), (cx, cy), (0, 255, 0), 2)
+    
+    def draw_joint_angles(self, frame, landmarks):
+        h, w, _ = frame.shape
+        
+        # Define joint triplets for angle calculation
+        joints = {
+            'right_elbow': [12, 14, 16],  # shoulder, elbow, wrist
+            'left_elbow': [11, 13, 15],
+            'right_knee': [24, 26, 28],   # hip, knee, ankle
+            'left_knee': [23, 25, 27]
+        }
+        
+        for joint_name, (p1, p2, p3) in joints.items():
+            angle = self.calculate_angle(landmarks.landmark[p1],
+                                      landmarks.landmark[p2],
+                                      landmarks.landmark[p3])
+            
+            # Get middle point (joint position) for text
+            x = int(landmarks.landmark[p2].x * w)
+            y = int(landmarks.landmark[p2].y * h)
+            
+            # Draw angle
+            cv2.putText(frame, f'{int(angle)}°', (x, y), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+    
+    @staticmethod
+    def calculate_angle(p1, p2, p3):
+        # Convert landmarks to numpy arrays
+        v1 = np.array([p1.x, p1.y])
+        v2 = np.array([p2.x, p2.y])
+        v3 = np.array([p3.x, p3.y])
+        
+        # Calculate vectors
+        v21 = v1 - v2
+        v23 = v3 - v2
+        
+        # Calculate angle
+        cosine = np.dot(v21, v23) / (np.linalg.norm(v21) * np.linalg.norm(v23))
+        angle = np.arccos(np.clip(cosine, -1.0, 1.0))
+        
+        return np.degrees(angle)
 
 def main():
-    # Initialize camera
     cap = cv2.VideoCapture(0)
     cap.set(3, 1280)
     cap.set(4, 720)
     
-    # Initialize detector
-    detector = DetectionTest()
+    mocap = MotionCapture()
     p_time = 0
-    window_name = 'Detection Test'
+    window_name = 'Motion Capture Test'
     
     while True:
         success, frame = cap.read()
@@ -103,11 +165,11 @@ def main():
             print("Failed to read from camera")
             break
             
-        # Flip frame horizontally
+        # Flip frame horizontally for more natural movement
         frame = cv2.flip(frame, 1)
         
         # Process frame
-        frame, results = detector.process_frame(frame)
+        frame, results = mocap.process_frame(frame)
         
         # Calculate and display FPS
         c_time = time.time()
@@ -118,8 +180,9 @@ def main():
         cv2.putText(frame, f'FPS: {int(fps)}', (10, 30), 
                     cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 2)
         
+        # Display detection status
         y_offset = 60
-        for det_type, is_enabled in detector.detection_flags.items():
+        for det_type, is_enabled in mocap.detection_flags.items():
             status = "ON" if is_enabled else "OFF"
             color = (0, 255, 0) if is_enabled else (0, 0, 255)
             cv2.putText(frame, f"{det_type}: {status}", (10, y_offset),
@@ -134,14 +197,14 @@ def main():
         if key == 27 or cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:  # ESC or window closed
             break
         elif key == ord('p'):  # Toggle pose detection
-            detector.detection_flags['pose'] = not detector.detection_flags['pose']
+            mocap.detection_flags['pose'] = not mocap.detection_flags['pose']
         elif key == ord('f'):  # Toggle face detection
-            detector.detection_flags['face'] = not detector.detection_flags['face']
+            mocap.detection_flags['face'] = not mocap.detection_flags['face']
         elif key == ord('h'):  # Toggle hand detection
-            detector.detection_flags['hands'] = not detector.detection_flags['hands']
+            mocap.detection_flags['hands'] = not mocap.detection_flags['hands']
     
     cap.release()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    main()
+    main() 
