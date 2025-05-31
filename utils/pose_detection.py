@@ -55,12 +55,15 @@ class PoseDetector:
         self.results = self.holistic.process(img_rgb)
 
         # Draw pose landmarks
-
         if self.results.pose_landmarks:
             if draw:
                 self.draw_landmarks(img, self.results.pose_landmarks, self.mp_holistic.POSE_CONNECTIONS, (255, 0, 0),
                                     draw)
-        self.store_landmarks(img, self.results.pose_landmarks, 'body')
+            # Only store landmarks if they are detected
+            self.store_landmarks(img, self.results.pose_landmarks, 'body')
+        else:
+            # Clear the landmarks if none are detected
+            self.body_landmarks = []
 
         return img
 
@@ -104,6 +107,9 @@ class PoseDetector:
 
     def store_landmarks(self, img, landmarks, part) -> list:
         lm_list = []
+        if landmarks is None:  # Add null check
+            return lm_list
+            
         h, w, c = img.shape  # Get image dimensions
 
         for lm_id, lm in enumerate(landmarks.landmark):
