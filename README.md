@@ -20,7 +20,7 @@ The project is currently in active development. Core functionality is implemente
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/AniMate.git
+git clone https://github.com/kreanimator/AniMate.git
 cd AniMate
 ```
 
@@ -39,6 +39,33 @@ zip -r animate_addon.zip animate_addon
    - Go to Edit > Preferences > Add-ons
    - Click "Install" and select the `animate_addon.zip` file you just created
    - Enable the addon by checking the box next to "Animation: AniMate"
+
+## Manual Dependency Installation (for Snap/Flatpak/Custom Blender)
+
+**Important:** If you are using Blender from Snap, Flatpak, or a custom build, you must manually install all dependencies from `requirements.txt` into Blender's Python environment.
+
+### Steps:
+1. Find Blender's Python executable:
+   ```bash
+   blender --background --python-expr "import sys; print(sys.executable)"
+   # Example output: /home/youruser/snap/blender-4.3.2-linux-x64/4.3/python/bin/python3.11
+   ```
+2. Find Blender's site-packages directory:
+   ```bash
+   blender --background --python-expr "import site; print(site.getsitepackages()[0])"
+   # Example output: /home/youruser/snap/blender-4.3.2-linux-x64/4.3/python/lib/python3.11/site-packages
+   ```
+3. For each dependency in `requirements.txt`, run:
+   ```bash
+   /path/to/blender/python/bin/python3.11 -m pip install --target=/path/to/blender/python/lib/python3.11/site-packages <package>
+   # Example:
+   /home/youruser/snap/blender-4.3.2-linux-x64/4.3/python/bin/python3.11 -m pip install --target=/home/youruser/snap/blender-4.3.2-linux-x64/4.3/python/lib/python3.11/site-packages packaging
+   /home/youruser/snap/blender-4.3.2-linux-x64/4.3/python/bin/python3.11 -m pip install --target=/home/youruser/snap/blender-4.3.2-linux-x64/4.3/python/lib/python3.11/site-packages opencv-python
+   /home/youruser/snap/blender-4.3.2-linux-x64/4.3/python/bin/python3.11 -m pip install --target=/home/youruser/snap/blender-4.3.2-linux-x64/4.3/python/lib/python3.11/site-packages mediapipe
+   /home/youruser/snap/blender-4.3.2-linux-x64/4.3/python/bin/python3.11 -m pip install --target=/home/youruser/snap/blender-4.3.2-linux-x64/4.3/python/lib/python3.11/site-packages Pillow
+   ```
+
+**Note:** You must repeat this for every dependency in `requirements.txt`.
 
 ## Project Structure
 

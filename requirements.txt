@@ -1,0 +1,4 @@
+packaging
+opencv-python
+mediapipe
+Pillow
