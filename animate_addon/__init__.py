@@ -3,8 +3,15 @@ AniMate - Blender Motion Capture Addon
 """
 
 import sys
-import subprocess
+import site
+# Remove user site-packages from sys.path to avoid confusion
+if hasattr(site, 'getusersitepackages'):
+    user_site = site.getusersitepackages()
+    if user_site in sys.path:
+        sys.path.remove(user_site)
 
+import subprocess
+# TODO: Need to find a way to automatically install dependencies with plugin
 def ensure_package(package, import_name=None):
     try:
         if import_name is None:
@@ -12,9 +19,18 @@ def ensure_package(package, import_name=None):
         __import__(import_name)
     except ImportError:
         python_exe = sys.executable
-        subprocess.check_call([python_exe, "-m", "pip", "install", package])
+        try:
+            subprocess.check_call([python_exe, "-m", "pip", "install", package])
+            # Try importing again after install
+            if import_name in sys.modules:
+                del sys.modules[import_name]
+            __import__(import_name)
+        except Exception as e:
+            print(f"[AniMate] Failed to install or import {package}: {e}")
+            raise
 
-# Ensure required packages for the addon
+# Ensure all required packages at the very top, before any other imports
+ensure_package("packaging")
 ensure_package("opencv-python", "cv2")
 ensure_package("mediapipe")
 
@@ -30,6 +46,8 @@ bl_info = {
     "category": "Animation",
 }
 
+# Now import everything else
+import math
 import bpy
 from bpy.props import (
     BoolProperty,
@@ -45,10 +63,11 @@ from bpy.types import (
 )
 from threading import Thread
 import time
-import numpy as np
 import bpy.utils.previews
 import bpy.app.timers
 import cv2
+import mediapipe as mp
+import numpy as np
 
 def get_rig_types(self, context):
     return [
@@ -199,9 +218,50 @@ class ANIMATE_OT_start_camera_preview(Operator):
             if not ret or frame is None:
                 print("[AniMate] Failed to read frame from camera.")
                 return {'PASS_THROUGH'}
+            frame = cv2.flip(frame, 0)  # Flip vertically for Blender
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = cv2.resize(frame, (640, 480))
-            frame_flat = (frame/255.0).astype(np.float32).flatten()
+            # Draw MediaPipe landmarks
+            props = context.scene.animate_properties
+            if not hasattr(self, 'mp_pose'):
+                self.mp_pose = mp.solutions.pose.Pose(static_image_mode=False, min_detection_confidence=0.5, min_tracking_confidence=0.5)
+                self.mp_face = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, min_detection_confidence=0.5)
+                self.mp_hands = mp.solutions.hands.Hands(static_image_mode=False, min_detection_confidence=0.5)
+                self.mp_drawing = mp.solutions.drawing_utils
+                self.mp_drawing_styles = mp.solutions.drawing_styles
+            results_pose = results_face = results_hands = None
+            if props.enable_pose:
+                results_pose = self.mp_pose.process(frame)
+                if results_pose.pose_landmarks:
+                    self.mp_drawing.draw_landmarks(
+                        frame,
+                        results_pose.pose_landmarks,
+                        self.mp_pose.POSE_CONNECTIONS,
+                        self.mp_drawing_styles.get_default_pose_landmarks_style())
+            if props.enable_face:
+                results_face = self.mp_face.process(frame)
+                if results_face.multi_face_landmarks:
+                    for face_landmarks in results_face.multi_face_landmarks:
+                        self.mp_drawing.draw_landmarks(
+                            frame,
+                            face_landmarks,
+                            self.mp_face.FACEMESH_TESSELATION,
+                            self.mp_drawing_styles.get_default_face_mesh_tesselation_style())
+            if props.enable_hands:
+                results_hands = self.mp_hands.process(frame)
+                if results_hands.multi_hand_landmarks:
+                    for hand_landmarks in results_hands.multi_hand_landmarks:
+                        self.mp_drawing.draw_landmarks(
+                            frame,
+                            hand_landmarks,
+                            self.mp_hands.HAND_CONNECTIONS,
+                            self.mp_drawing_styles.get_default_hand_landmarks_style(),
+                            self.mp_drawing_styles.get_default_hand_connections_style())
+            # Add alpha channel
+            h, w, _ = frame.shape
+            alpha = np.ones((h, w, 1), dtype=np.uint8) * 255
+            frame_rgba = np.concatenate((frame, alpha), axis=2)
+            frame_flat = (frame_rgba / 255.0).astype(np.float32).flatten()
             img = bpy.data.images.get(self._img_name)
             if img and len(frame_flat) == img.size[0] * img.size[1] * img.channels:
                 img.pixels = frame_flat.tolist()
@@ -209,6 +269,9 @@ class ANIMATE_OT_start_camera_preview(Operator):
         return {'PASS_THROUGH'}
 
     def execute(self, context):
+        if not hasattr(sys.modules[__name__], 'np'):
+            import numpy as np
+            sys.modules[__name__].np = np
         props = context.scene.animate_properties
         if props.camera_preview_running:
             self.report({'WARNING'}, "Camera preview already running.")
@@ -222,18 +285,21 @@ class ANIMATE_OT_start_camera_preview(Operator):
             return {'CANCELLED'}
         # Create Blender image datablock if needed
         if self._img_name not in bpy.data.images:
-            bpy.data.images.new(self._img_name, width=640, height=480)
+            bpy.data.images.new(self._img_name, width=640, height=480, alpha=True, float_buffer=True)
         img = bpy.data.images[self._img_name]
         img.generated_width = 640
         img.generated_height = 480
         img.colorspace_settings.name = 'sRGB'
         # Create plane if not present
         if self._plane_name not in bpy.data.objects:
-            bpy.ops.mesh.primitive_plane_add(size=4, location=(0, 0, 1))
+            bpy.ops.mesh.primitive_plane_add(size=4, location=(0, -2, 1))
             plane = context.active_object
             plane.name = self._plane_name
+            plane.rotation_euler = (math.radians(90), 0, 0)
         else:
             plane = bpy.data.objects[self._plane_name]
+            plane.location = (0, -2, 1)
+            plane.rotation_euler = (math.radians(90), 0, 0)
         # Create material if not present
         if self._mat_name not in bpy.data.materials:
             mat = bpy.data.materials.new(self._mat_name)
