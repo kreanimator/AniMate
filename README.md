@@ -159,3 +159,23 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - MediaPipe for the motion capture technology
 - Blender for the 3D animation platform
+
+## Packaging and Installing the Addon in Blender
+
+To install this addon in Blender, you need to package all required folders into a single zip file. Use the provided shell script:
+
+1. Open a terminal in your project root.
+2. Run:
+   ```bash
+   bash package_addon.sh
+   ```
+3. This will create `animate_addon.zip` in your project root.
+4. In Blender, go to `Edit > Preferences > Add-ons > Install`, and select `animate_addon.zip`.
+5. Enable the addon in the list.
+
+**The script will include:**
+- `animate_addon/` (main addon code)
+- `rig/` (rig logic and mappings)
+- `data/` (any data files needed)
+
+If you add more dependencies (like `utils/` or `examples/`), uncomment the relevant lines in `package_addon.sh`.

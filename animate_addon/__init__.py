@@ -102,6 +102,11 @@ class AniMateProperties(PropertyGroup):
         description="Enable hand detection",
         default=True
     )
+    show_camera_preview: BoolProperty(
+        name="Show Camera Preview",
+        description="Show the camera preview in the Image Editor",
+        default=True
+    )
     target_armature: PointerProperty(
         name="Target Armature",
         description="Armature to animate",
@@ -155,13 +160,6 @@ class ANIMATE_PT_main_panel(Panel):
         box.prop(props, "enable_face")
         box.prop(props, "enable_hands")
 
-        # Start/Stop capture
-        row = layout.row()
-        if not context.scene.animate_running:
-            row.operator("animate.start_capture", text="Start Capture")
-        else:
-            row.operator("animate.stop_capture", text="Stop Capture")
-
 class ANIMATE_PT_camera_preview(Panel):
     bl_label = "Camera Preview"
     bl_idname = "ANIMATE_PT_camera_preview"
@@ -174,57 +172,30 @@ class ANIMATE_PT_camera_preview(Panel):
         layout = self.layout
         props = context.scene.animate_properties
         row = layout.row()
-        if not props.camera_preview_running:
-            row.operator("animate.start_camera_preview", text="Start Camera Preview")
+        if not context.scene.animate_running:
+            row.operator("animate.start_capture", text="Start Motion Capture")
         else:
-            row.operator("animate.stop_camera_preview", text="Stop Camera Preview")
+            row.operator("animate.stop_capture", text="Stop Motion Capture")
+        layout.prop(props, "show_camera_preview")
         layout.label(text="The largest area will be split and the camera preview")
-        layout.label(text="will appear in the new Image Editor area.")
-        layout.label(text="If the split fails, the largest area will switch to the preview.")
-
-class ANIMATE_OT_start_capture(Operator):
-    """Start motion capture."""
-    bl_idname = "animate.start_capture"
-    bl_label = "Start Capture"
-    bl_description = "Start motion capture"
-
-    def execute(self, context):
-        # TODO: Implement capture start
-        context.scene.animate_running = True
-        return {'FINISHED'}
-
-class ANIMATE_OT_stop_capture(Operator):
-    """Stop motion capture."""
-    bl_idname = "animate.stop_capture"
-    bl_label = "Stop Capture"
-    bl_description = "Stop motion capture"
-
-    def execute(self, context):
-        # TODO: Implement capture stop
-        context.scene.animate_running = False
-        return {'FINISHED'}
-
-# Helper function to join all areas into one before splitting, then split and assign left/right as before. This ensures the split always works and the layout is as desired.
-def join_all_areas_to_one(window, screen):
-    # Join all areas into the largest one
-    areas = list(screen.areas)
-    if len(areas) <= 1:
-        return
-    # Find the largest area
-    main_area = max(areas, key=lambda a: a.width * a.height)
-    for area in areas:
-        if area != main_area:
-            override = {'window': window, 'area': area}
-            try:
-                bpy.ops.screen.area_join(override, min_x=main_area.x, min_y=main_area.y, max_x=area.x, max_y=area.y)
-            except Exception as e:
-                print(f"[AniMate] Area join failed: {e}")
+        layout.label(text="will appear in the new Image Editor area if enabled.")
+        layout.label(text="Your model will move in real-time.")
 
 def split_and_set_image_editor(img_name):
     import bpy
     window = bpy.context.window
     screen = window.screen
-    join_all_areas_to_one(window, screen)
+    # Join all areas into the largest one
+    areas = list(screen.areas)
+    if len(areas) > 1:
+        main_area = max(areas, key=lambda a: a.width * a.height)
+        for area in areas:
+            if area != main_area:
+                override = {'window': window, 'area': area}
+                try:
+                    bpy.ops.screen.area_join(override, min_x=main_area.x, min_y=main_area.y, max_x=area.x, max_y=area.y)
+                except Exception as e:
+                    print(f"[AniMate] Area join failed: {e}")
     # Now only one area, split it by calling the operator directly
     try:
         bpy.ops.screen.area_split(direction='VERTICAL', factor=0.5)
@@ -246,17 +217,18 @@ def split_and_set_image_editor(img_name):
                 break
     return None  # Only run once
 
-class ANIMATE_OT_start_camera_preview(Operator):
-    bl_idname = "animate.start_camera_preview"
-    bl_label = "Start Camera Preview"
-    bl_description = "Start camera preview with MediaPipe detection"
+class ANIMATE_OT_start_capture(Operator):
+    """Start motion capture."""
+    bl_idname = "animate.start_capture"
+    bl_label = "Start Capture"
+    bl_description = "Start motion capture"
 
     _timer = None
     _cap = None
-    _img_name = "AniMateCameraPreview"
+    _mapper = None
 
     def modal(self, context, event):
-        if not context.scene.animate_properties.camera_preview_running:
+        if not context.scene.animate_running:
             return {'CANCELLED'}
 
         if event.type == 'TIMER':
@@ -270,9 +242,15 @@ class ANIMATE_OT_start_camera_preview(Operator):
             # Process frame with MediaPipe
             props = context.scene.animate_properties
             
+            pose_landmarks = None
+            face_landmarks = None
+            left_hand_landmarks = None
+            right_hand_landmarks = None
+            
             if props.enable_pose:
                 results_pose = self.mp_pose.process(frame)
                 if results_pose.pose_landmarks:
+                    pose_landmarks = results_pose.pose_landmarks
                     mp_drawing.draw_landmarks(
                         frame,
                         results_pose.pose_landmarks,
@@ -282,6 +260,7 @@ class ANIMATE_OT_start_camera_preview(Operator):
             if props.enable_face:
                 results_face = self.mp_face.process(frame)
                 if results_face.multi_face_landmarks:
+                    face_landmarks = results_face.multi_face_landmarks[0]
                     for face_landmarks in results_face.multi_face_landmarks:
                         mp_drawing.draw_landmarks(
                             frame,
@@ -292,6 +271,10 @@ class ANIMATE_OT_start_camera_preview(Operator):
             if props.enable_hands:
                 results_hands = self.mp_hands.process(frame)
                 if results_hands.multi_hand_landmarks:
+                    if len(results_hands.multi_hand_landmarks) > 0:
+                        left_hand_landmarks = results_hands.multi_hand_landmarks[0]
+                    if len(results_hands.multi_hand_landmarks) > 1:
+                        right_hand_landmarks = results_hands.multi_hand_landmarks[1]
                     for hand_landmarks in results_hands.multi_hand_landmarks:
                         mp_drawing.draw_landmarks(
                             frame,
@@ -300,13 +283,22 @@ class ANIMATE_OT_start_camera_preview(Operator):
                             mp_drawing_styles.get_default_hand_landmarks_style(),
                             mp_drawing_styles.get_default_hand_connections_style())
 
-            # Convert to RGBA, flip vertically for Blender, and normalize
+            # Update the rig with the detected landmarks
+            if self._mapper:
+                self._mapper.update_rig(
+                    pose_landmarks=pose_landmarks,
+                    face_landmarks=face_landmarks,
+                    left_hand_landmarks=left_hand_landmarks,
+                    right_hand_landmarks=right_hand_landmarks
+                )
+
+            # Update the preview image
             h, w, _ = frame.shape
             alpha = np.ones((h, w, 1), dtype=np.uint8) * 255
             frame_rgba = np.concatenate((frame, alpha), axis=2)
             frame_rgba = np.flipud(frame_rgba)  # Flip vertically for Blender
             frame_flat = (frame_rgba / 255.0).astype(np.float32).flatten()
-            img = bpy.data.images.get(self._img_name)
+            img = bpy.data.images.get("AniMateCameraPreview")
             if img and len(frame_flat) == img.size[0] * img.size[1] * img.channels:
                 img.pixels = frame_flat.tolist()
                 img.update()
@@ -314,17 +306,20 @@ class ANIMATE_OT_start_camera_preview(Operator):
         return {'PASS_THROUGH'}
 
     def execute(self, context):
-        if not hasattr(sys.modules[__name__], 'np'):
-            import numpy as np
-            sys.modules[__name__].np = np
-
         props = context.scene.animate_properties
-        if props.camera_preview_running:
-            self.report({'WARNING'}, "Camera preview already running.")
-            props.camera_preview_running = False  # Ensure reset if stuck
+        
+        # Check if we have a valid armature
+        if not props.target_armature:
+            self.report({'ERROR'}, "No armature selected. Please select a target armature.")
+            return {'CANCELLED'}
+            
+        if props.target_armature.type != 'ARMATURE':
+            self.report({'ERROR'}, "Selected object is not an armature.")
             return {'CANCELLED'}
 
-        props.camera_preview_running = True
+        if context.scene.animate_running:
+            self.report({'WARNING'}, "Motion capture already running.")
+            return {'CANCELLED'}
 
         try:
             # Initialize MediaPipe solutions
@@ -351,29 +346,33 @@ class ANIMATE_OT_start_camera_preview(Operator):
             self._cap = cv2.VideoCapture(0)
             if not self._cap.isOpened():
                 self.report({'ERROR'}, "Could not open camera.")
-                props.camera_preview_running = False
                 return {'CANCELLED'}
 
             # Create Blender image datablock if needed
-            if self._img_name not in bpy.data.images:
-                bpy.data.images.new(self._img_name, width=640, height=480, alpha=True, float_buffer=True, generated_type='BLANK')
-            img = bpy.data.images[self._img_name]
+            if "AniMateCameraPreview" not in bpy.data.images:
+                bpy.data.images.new("AniMateCameraPreview", width=640, height=480, alpha=True, float_buffer=True, generated_type='BLANK')
+            img = bpy.data.images["AniMateCameraPreview"]
             img.generated_width = 640
             img.generated_height = 480
             img.colorspace_settings.name = 'sRGB'
             img.use_fake_user = True
 
-            # Directly split and set image editor (no timer)
-            split_and_set_image_editor(self._img_name)
+            # Initialize the rig mapper
+            from rig.blender_mapper import BlenderRigMapper
+            self._mapper = BlenderRigMapper(props.target_armature, rig_type=props.rig_type)
 
-            # Add timer
+            # Split the view and set up the preview if enabled
+            if props.show_camera_preview:
+                split_and_set_image_editor("AniMateCameraPreview")
+
+            # Start capture
+            context.scene.animate_running = True
             self._timer = context.window_manager.event_timer_add(1/30, window=context.window)
             context.window_manager.modal_handler_add(self)
 
             return {'RUNNING_MODAL'}
         except Exception as e:
-            self.report({'ERROR'}, f"Failed to start camera preview: {e}")
-            props.camera_preview_running = False
+            self.report({'ERROR'}, f"Failed to start motion capture: {e}")
             return {'CANCELLED'}
 
     def cancel(self, context):
@@ -387,15 +386,16 @@ class ANIMATE_OT_start_camera_preview(Operator):
             self.mp_face.close()
         if hasattr(self, 'mp_hands'):
             self.mp_hands.close()
-        context.scene.animate_properties.camera_preview_running = False
+        context.scene.animate_running = False
 
-class ANIMATE_OT_stop_camera_preview(Operator):
-    bl_idname = "animate.stop_camera_preview"
-    bl_label = "Stop Camera Preview"
-    bl_description = "Stop camera preview"
+class ANIMATE_OT_stop_capture(Operator):
+    """Stop motion capture."""
+    bl_idname = "animate.stop_capture"
+    bl_label = "Stop Capture"
+    bl_description = "Stop motion capture"
 
     def execute(self, context):
-        context.scene.animate_properties.camera_preview_running = False
+        context.scene.animate_running = False
         return {'FINISHED'}
 
 classes = (
@@ -404,8 +404,6 @@ classes = (
     ANIMATE_PT_camera_preview,
     ANIMATE_OT_start_capture,
     ANIMATE_OT_stop_capture,
-    ANIMATE_OT_start_camera_preview,
-    ANIMATE_OT_stop_camera_preview,
 )
 
 def register():
