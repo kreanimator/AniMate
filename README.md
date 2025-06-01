@@ -32,30 +32,30 @@ pip install -r requirements.txt
 3. Install the Blender addon:
    - Open Blender
    - Go to Edit > Preferences > Add-ons
-   - Click "Install" and select the `addon/__init__.py` file from this repository
+   - Click "Install" and select the `animate_addon` folder from this repository
    - Enable the addon by checking the box next to "Animation: AniMate"
 
 ## Project Structure
 
 ```
 AniMate/
-├── addon/                  # Blender addon files
-│   └── __init__.py        # Addon initialization and UI
-├── data/                   # Data and configuration files
-│   ├── bone_mappings.py    # MediaPipe to Blender bone mappings
+├── animate_addon/         # Blender addon files
+│   └── __init__.py       # Addon initialization and UI
+├── data/                  # Data and configuration files
+│   ├── bone_mappings.py   # MediaPipe to Blender bone mappings
 │   ├── landmark_structure.py # MediaPipe landmark definitions
-│   └── test_rigs.py        # Test rig configurations
-├── examples/               # Example scripts
-│   └── live_capture.py     # Live motion capture example
-├── rig/                    # Blender rig functionality
-│   ├── blender_mapper.py   # Blender-specific rig mapping
-│   └── retargeting.py      # Retargeting functionality
-├── tests/                  # Test scripts
-│   ├── test_detection.py   # MediaPipe detection tests
-│   └── test_rig.py         # Rig functionality tests
-├── utils/                  # Utility functions
-│   └── detection.py        # MediaPipe detection module
-└── README.md              # This file
+│   └── test_rigs.py       # Test rig configurations
+├── examples/              # Example scripts
+│   └── live_capture.py    # Live motion capture example
+├── rig/                   # Blender rig functionality
+│   ├── blender_mapper.py  # Blender-specific rig mapping
+│   └── retargeting.py     # Retargeting functionality
+├── tests/                 # Test scripts
+│   ├── test_detection.py  # MediaPipe detection tests
+│   └── test_rig.py        # Rig functionality tests
+├── utils/                 # Utility functions
+│   └── detection.py       # MediaPipe detection module
+└── README.md             # This file
 ```
 
 ## Usage
@@ -96,7 +96,7 @@ Controls:
    - Implement rig-specific mapping in `rig/blender_mapper.py`
 
 3. Addon UI:
-   - Modify `addon/__init__.py` to add new UI elements
+   - Modify `animate_addon/__init__.py` to add new UI elements
    - Add new operators and properties as needed
 
 ### Testing
