@@ -1,93 +1,109 @@
-# AniMate - Blender Motion Capture Plugin
+# AniMate
 
-A Blender plugin for real-time motion capture and animation of humanoid rigs using MediaPipe.
+A Blender plugin for animating humanoid rigs using motion capture data from MediaPipe.
 
 ## Features
 
 - Real-time motion capture using MediaPipe
-- Support for full body tracking
-- Face tracking and expression mapping
-- Hand tracking and finger animation
-- Automatic bone mapping and retargeting
-- Smooth motion interpolation
+- Support for pose, face, and hand tracking
+- Configurable bone mappings
+- Test rigs for development and testing
+- Modular and extensible architecture
 
 ## Project Status
 
-🚧 **Under Development**
+🚧 **Under Development** 🚧
 
-Currently implementing:
-- Core motion capture functionality
-- Bone mapping system
-- Basic retargeting
-
-## Requirements
-
-- Blender 3.0 or higher
-- Python 3.7+
-- MediaPipe
-- NumPy
-- OpenCV
+The project is currently in active development. Core functionality is implemented but may have bugs or missing features.
 
 ## Installation
 
-1. Clone this repository:
+1. Clone the repository:
 ```bash
-git clone https://github.com/kreanimator/AniMate.git
+git clone https://github.com/yourusername/AniMate.git
+cd AniMate
 ```
 
-2. Install required Python packages:
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Install the plugin in Blender:
+3. Install the Blender addon:
    - Open Blender
    - Go to Edit > Preferences > Add-ons
-   - Click "Install" and select the `__init__.py` file from this repository
-   - Enable the plugin
-
-## Usage
-
-1. Open Blender and load your humanoid rig
-2. Enable the AniMate plugin
-3. Select your armature in the scene
-4. Click "Start Capture" in the AniMate panel
-5. Position yourself in front of the camera
-6. The rig will follow your movements in real-time
+   - Click "Install" and select the `addon` folder from this repository
 
 ## Project Structure
 
 ```
 AniMate/
-├── rig/                    # Core rigging functionality
-│   ├── blender_mapper.py   # Blender-specific bone mapping
-│   ├── retargeting.py      # Motion retargeting logic
-│   └── mappings/          # Bone mapping configurations
+├── data/                   # Data and configuration files
+│   ├── bone_mappings.py    # MediaPipe to Blender bone mappings
+│   ├── landmark_structure.py # MediaPipe landmark definitions
+│   └── test_rigs.py        # Test rig configurations
+├── examples/               # Example scripts
+│   └── live_capture.py     # Live motion capture example
+├── rig/                    # Blender rig functionality
+│   ├── blender_mapper.py   # Blender-specific rig mapping
+│   └── retargeting.py      # Retargeting functionality
+├── tests/                  # Test scripts
+│   ├── test_detection.py   # MediaPipe detection tests
+│   └── test_rig.py         # Rig functionality tests
 ├── utils/                  # Utility functions
-├── tests/                  # Test files
-└── data/                   # Sample data and configurations
+│   └── detection.py        # MediaPipe detection module
+└── README.md              # This file
+```
+
+## Usage
+
+### Testing Detection
+
+To test the MediaPipe detection functionality:
+
+```bash
+python tests/test_detection.py
+```
+
+Controls:
+- 'p' - Toggle pose detection
+- 'f' - Toggle face detection
+- 'h' - Toggle hand detection
+- 'ESC' - Exit
+
+### Live Motion Capture
+
+To use the live motion capture with Blender:
+
+1. Open Blender
+2. Run the example script:
+```bash
+python examples/live_capture.py
 ```
 
 ## Development
 
-### Setting up Development Environment
+### Adding New Features
 
-1. Create a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+1. Detection:
+   - Add new detection types in `utils/detection.py`
+   - Update bone mappings in `data/bone_mappings.py`
 
-2. Install development dependencies:
-```bash
-pip install -r requirements-dev.txt
-```
+2. Rig Support:
+   - Add new rig configurations in `data/test_rigs.py`
+   - Implement rig-specific mapping in `rig/blender_mapper.py`
 
 ### Testing
 
-- Use Blender's Python console for quick testing
-- Run unit tests: `python -m pytest tests/`
-- For visual testing, use the test rig in `tests/test_rig.blend`
+1. Run detection tests:
+```bash
+python tests/test_detection.py
+```
+
+2. Run rig tests:
+```bash
+python tests/test_rig.py
+```
 
 ## Contributing
 
@@ -99,4 +115,9 @@ pip install -r requirements-dev.txt
 
 ## License
 
-MIT License - see LICENSE file for details 
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- MediaPipe for the motion capture technology
+- Blender for the 3D animation platform 
