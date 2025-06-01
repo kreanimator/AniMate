@@ -283,6 +283,12 @@ class ANIMATE_OT_start_capture(Operator):
                             mp_drawing_styles.get_default_hand_landmarks_style(),
                             mp_drawing_styles.get_default_hand_connections_style())
 
+            # Debug prints
+            print(f"[AniMate] Modal running")
+            print(f"[AniMate] Mapper: {self._mapper}")
+            print(f"[AniMate] Target armature: {props.target_armature}")
+            print(f"[AniMate] Landmarks: pose={pose_landmarks is not None}, face={face_landmarks is not None}, left_hand={left_hand_landmarks is not None}, right_hand={right_hand_landmarks is not None}")
+
             # Update the rig with the detected landmarks
             if self._mapper:
                 self._mapper.update_rig(
