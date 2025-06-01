@@ -5,24 +5,59 @@ import bpy
 import math
 from mathutils import Vector, Matrix, Euler
 from .mappings.mapping_factory import RigMappingFactory
+import logging
+import sys
+
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.DEBUG,
+    format='[%(levelname)s] %(name)s: %(message)s'
+)
+
+logger = logging.getLogger("AniMateRigMapper")
+logger.setLevel(logging.DEBUG)
 
 class BlenderRigMapper:
     def __init__(self, armature_obj=None, rig_type='MIXAMO'):
+        print(f"[AniMateRigMapper] Creating BlenderRigMapper for rig_type={rig_type}")
         self.armature = armature_obj
         self.pose_bones = {}
         self.previous_rotations = {}
         self.mapping = RigMappingFactory.create_mapping(rig_type)
+        self.prefix = ''
         if armature_obj:
             self.setup_armature(armature_obj)
 
     def setup_armature(self, armature_obj):
-        """Initialize the armature and store references to bones"""
+        print(f"[AniMateRigMapper] Setting up armature: {armature_obj.name if armature_obj else 'None'}")
         self.armature = armature_obj
         if not self.armature or self.armature.type != 'ARMATURE':
+            print("[AniMateRigMapper] ERROR: Invalid armature object")
             raise ValueError("Invalid armature object")
         
+        # Detect common prefix (e.g., 'mixamorig:')
+        bone_names = [bone.name for bone in self.armature.pose.bones]
+        prefix = ''
+        if bone_names:
+            # Find the longest common prefix ending with ':'
+            first = bone_names[0]
+            for i in range(len(first)):
+                c = first[i]
+                for name in bone_names:
+                    if i >= len(name) or name[i] != c:
+                        prefix = first[:i]
+                        break
+                else:
+                    continue
+                break
+            if prefix and not prefix.endswith(':'):
+                prefix = ''
+            self.prefix = prefix
+        else:
+            self.prefix = ''
         # Store pose bones for quick access
         self.pose_bones = {bone.name: bone for bone in self.armature.pose.bones}
+        print(f"[AniMateRigMapper] Detected bones: {list(self.pose_bones.keys())}")
         
         # Verify bone hierarchy matches the mapping
         self._verify_bone_hierarchy()
@@ -73,6 +108,7 @@ class BlenderRigMapper:
     def process_pose_landmarks(self, landmarks):
         """Process pose landmarks and apply to armature"""
         if not self.armature or not landmarks:
+            print("[AniMateRigMapper] WARNING: No armature or landmarks for pose processing.")
             return
 
         # Convert landmarks to world space coordinates
@@ -86,10 +122,11 @@ class BlenderRigMapper:
         
         # Process each mapped bone
         for bone_name, landmark_indices in pose_mapping.items():
-            if bone_name not in self.pose_bones:
+            full_bone_name = self.prefix + bone_name
+            if full_bone_name not in self.pose_bones:
+                print(f"[AniMateRigMapper] WARNING: Bone not found in armature: {full_bone_name}")
                 continue
-
-            bone = self.pose_bones[bone_name]
+            bone = self.pose_bones[full_bone_name]
             
             # Calculate bone orientation from landmarks
             if len(landmark_indices) == 2:
@@ -122,11 +159,13 @@ class BlenderRigMapper:
             self.previous_rotations[bone_name] = rotation
             
             # Apply rotation to bone
+            print(f"[AniMateRigMapper] Updating bone: {full_bone_name} with rotation {rotation}")
             bone.rotation_euler = rotation
 
     def process_face_landmarks(self, landmarks):
         """Process face landmarks and apply to face rig/shape keys"""
         if not landmarks:
+            print("[AniMateRigMapper] WARNING: No landmarks for face processing.")
             return
         
         # Get face mapping for this rig type
@@ -134,7 +173,9 @@ class BlenderRigMapper:
         
         # Process each mapped face bone
         for bone_name, landmark_indices in face_mapping.items():
-            if bone_name not in self.pose_bones:
+            full_bone_name = self.prefix + bone_name
+            if full_bone_name not in self.pose_bones:
+                print(f"[AniMateRigMapper] WARNING: Face bone not found in armature: {full_bone_name}")
                 continue
                 
             # Convert landmarks to world space
@@ -156,11 +197,13 @@ class BlenderRigMapper:
                                 rotation.z * scale_factor))
                                 
                 # Apply to bone
-                self.pose_bones[bone_name].rotation_euler = rotation
+                print(f"[AniMateRigMapper] Updating face bone: {full_bone_name} with rotation {rotation}")
+                self.pose_bones[full_bone_name].rotation_euler = rotation
 
     def process_hand_landmarks(self, landmarks, is_right_hand=True):
         """Process hand landmarks and apply to hand rig"""
         if not landmarks:
+            print("[AniMateRigMapper] WARNING: No landmarks for hand processing.")
             return
             
         # Get hand mapping for this rig type
@@ -175,7 +218,9 @@ class BlenderRigMapper:
         for finger_name, joint_indices in hand_mapping.items():
             # Adjust bone name based on hand side
             bone_name = finger_name.replace('.L', '.R') if is_right_hand else finger_name
-            if bone_name not in self.pose_bones:
+            full_bone_name = self.prefix + bone_name
+            if full_bone_name not in self.pose_bones:
+                print(f"[AniMateRigMapper] WARNING: Hand bone not found in armature: {full_bone_name}")
                 continue
                 
             # Calculate rotation from landmarks
@@ -192,7 +237,8 @@ class BlenderRigMapper:
                                 rotation.z * scale_factor))
                                 
                 # Apply to bone
-                self.pose_bones[bone_name].rotation_euler = rotation
+                print(f"[AniMateRigMapper] Updating hand bone: {full_bone_name} with rotation {rotation}")
+                self.pose_bones[full_bone_name].rotation_euler = rotation
 
     @staticmethod
     def lerp(a, b, t):
