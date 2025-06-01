@@ -13,6 +13,7 @@ if hasattr(site, 'getusersitepackages'):
 import subprocess
 # TODO: Need to find a way to automatically install dependencies with plugin
 def ensure_package(package, import_name=None):
+    global RESTART_REQUIRED
     try:
         if import_name is None:
             import_name = package
@@ -69,6 +70,13 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
+# Initialize MediaPipe solutions
+mp_pose = mp.solutions.pose
+mp_face_mesh = mp.solutions.face_mesh
+mp_hands = mp.solutions.hands
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+
 def get_rig_types(self, context):
     return [
         ('MIXAMO', 'Mixamo', 'Mixamo Rig'),
@@ -120,9 +128,7 @@ class AniMateProperties(PropertyGroup):
         description="Name of the Blender image datablock for preview",
         default="AniMateCameraPreview"
     )
-
-class DummyImageUser:
-    frame_current = 1
+    
 
 class ANIMATE_PT_main_panel(Panel):
     """Main panel for AniMate."""
@@ -172,9 +178,9 @@ class ANIMATE_PT_camera_preview(Panel):
             row.operator("animate.start_camera_preview", text="Start Camera Preview")
         else:
             row.operator("animate.stop_camera_preview", text="Stop Camera Preview")
-        layout.label(text="The live camera feed will appear on a plane in the 3D View.")
-        layout.label(text="Switch to Material Preview or Rendered view to see it.")
-        layout.label(text="You can move/scale the plane as needed.")
+        layout.label(text="The largest area will be split and the camera preview")
+        layout.label(text="will appear in the new Image Editor area.")
+        layout.label(text="If the split fails, the largest area will switch to the preview.")
 
 class ANIMATE_OT_start_capture(Operator):
     """Start motion capture."""
@@ -198,158 +204,195 @@ class ANIMATE_OT_stop_capture(Operator):
         context.scene.animate_running = False
         return {'FINISHED'}
 
+# Helper function to join all areas into one before splitting, then split and assign left/right as before. This ensures the split always works and the layout is as desired.
+def join_all_areas_to_one(window, screen):
+    # Join all areas into the largest one
+    areas = list(screen.areas)
+    if len(areas) <= 1:
+        return
+    # Find the largest area
+    main_area = max(areas, key=lambda a: a.width * a.height)
+    for area in areas:
+        if area != main_area:
+            override = {'window': window, 'area': area}
+            try:
+                bpy.ops.screen.area_join(override, min_x=main_area.x, min_y=main_area.y, max_x=area.x, max_y=area.y)
+            except Exception as e:
+                print(f"[AniMate] Area join failed: {e}")
+
+def split_and_set_image_editor(img_name):
+    import bpy
+    window = bpy.context.window
+    screen = window.screen
+    join_all_areas_to_one(window, screen)
+    # Now only one area, split it by calling the operator directly
+    try:
+        bpy.ops.screen.area_split(direction='VERTICAL', factor=0.5)
+        areas = sorted(screen.areas, key=lambda a: a.x)
+        left_area, right_area = areas[0], areas[1]
+        left_area.type = 'IMAGE_EDITOR'
+        for space in left_area.spaces:
+            if space.type == 'IMAGE_EDITOR':
+                space.image = bpy.data.images[img_name]
+                break
+        right_area.type = 'VIEW_3D'
+    except Exception as e:
+        print(f"[AniMate] Area split failed: {e}. Switching largest area to IMAGE_EDITOR.")
+        max_area = max(screen.areas, key=lambda a: a.width * a.height)
+        max_area.type = 'IMAGE_EDITOR'
+        for space in max_area.spaces:
+            if space.type == 'IMAGE_EDITOR':
+                space.image = bpy.data.images[img_name]
+                break
+    return None  # Only run once
+
 class ANIMATE_OT_start_camera_preview(Operator):
     bl_idname = "animate.start_camera_preview"
     bl_label = "Start Camera Preview"
-    bl_description = "Start the camera preview and show it on a plane in the 3D View"
+    bl_description = "Start camera preview with MediaPipe detection"
 
     _timer = None
     _cap = None
     _img_name = "AniMateCameraPreview"
-    _plane_name = "AniMateCameraPlane"
-    _mat_name = "AniMateCameraMaterial"
 
     def modal(self, context, event):
         if not context.scene.animate_properties.camera_preview_running:
-            self.cancel(context)
             return {'CANCELLED'}
+
         if event.type == 'TIMER':
             ret, frame = self._cap.read()
-            if not ret or frame is None:
-                print("[AniMate] Failed to read frame from camera.")
+            if not ret:
                 return {'PASS_THROUGH'}
-            frame = cv2.flip(frame, 0)  # Flip vertically for Blender
+
+            # Convert frame to RGB
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame = cv2.resize(frame, (640, 480))
-            # Draw MediaPipe landmarks
+            
+            # Process frame with MediaPipe
             props = context.scene.animate_properties
-            if not hasattr(self, 'mp_pose'):
-                self.mp_pose = mp.solutions.pose.Pose(static_image_mode=False, min_detection_confidence=0.5, min_tracking_confidence=0.5)
-                self.mp_face = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, min_detection_confidence=0.5)
-                self.mp_hands = mp.solutions.hands.Hands(static_image_mode=False, min_detection_confidence=0.5)
-                self.mp_drawing = mp.solutions.drawing_utils
-                self.mp_drawing_styles = mp.solutions.drawing_styles
-            results_pose = results_face = results_hands = None
+            
             if props.enable_pose:
                 results_pose = self.mp_pose.process(frame)
                 if results_pose.pose_landmarks:
-                    self.mp_drawing.draw_landmarks(
+                    mp_drawing.draw_landmarks(
                         frame,
                         results_pose.pose_landmarks,
-                        self.mp_pose.POSE_CONNECTIONS,
-                        self.mp_drawing_styles.get_default_pose_landmarks_style())
+                        mp_pose.POSE_CONNECTIONS,
+                        mp_drawing_styles.get_default_pose_landmarks_style())
+            
             if props.enable_face:
                 results_face = self.mp_face.process(frame)
                 if results_face.multi_face_landmarks:
                     for face_landmarks in results_face.multi_face_landmarks:
-                        self.mp_drawing.draw_landmarks(
+                        mp_drawing.draw_landmarks(
                             frame,
                             face_landmarks,
-                            self.mp_face.FACEMESH_TESSELATION,
-                            self.mp_drawing_styles.get_default_face_mesh_tesselation_style())
+                            mp_face_mesh.FACEMESH_TESSELATION,
+                            mp_drawing_styles.get_default_face_mesh_tesselation_style())
+            
             if props.enable_hands:
                 results_hands = self.mp_hands.process(frame)
                 if results_hands.multi_hand_landmarks:
                     for hand_landmarks in results_hands.multi_hand_landmarks:
-                        self.mp_drawing.draw_landmarks(
+                        mp_drawing.draw_landmarks(
                             frame,
                             hand_landmarks,
-                            self.mp_hands.HAND_CONNECTIONS,
-                            self.mp_drawing_styles.get_default_hand_landmarks_style(),
-                            self.mp_drawing_styles.get_default_hand_connections_style())
-            # Add alpha channel
+                            mp_hands.HAND_CONNECTIONS,
+                            mp_drawing_styles.get_default_hand_landmarks_style(),
+                            mp_drawing_styles.get_default_hand_connections_style())
+
+            # Convert to RGBA, flip vertically for Blender, and normalize
             h, w, _ = frame.shape
             alpha = np.ones((h, w, 1), dtype=np.uint8) * 255
             frame_rgba = np.concatenate((frame, alpha), axis=2)
+            frame_rgba = np.flipud(frame_rgba)  # Flip vertically for Blender
             frame_flat = (frame_rgba / 255.0).astype(np.float32).flatten()
             img = bpy.data.images.get(self._img_name)
             if img and len(frame_flat) == img.size[0] * img.size[1] * img.channels:
                 img.pixels = frame_flat.tolist()
                 img.update()
+
         return {'PASS_THROUGH'}
 
     def execute(self, context):
         if not hasattr(sys.modules[__name__], 'np'):
             import numpy as np
             sys.modules[__name__].np = np
+
         props = context.scene.animate_properties
         if props.camera_preview_running:
             self.report({'WARNING'}, "Camera preview already running.")
+            props.camera_preview_running = False  # Ensure reset if stuck
             return {'CANCELLED'}
+
         props.camera_preview_running = True
-        # Open camera
-        self._cap = cv2.VideoCapture(0)
-        if not self._cap.isOpened():
-            self.report({'ERROR'}, "Could not open camera.")
+
+        try:
+            # Initialize MediaPipe solutions
+            self.mp_pose = mp_pose.Pose(
+                static_image_mode=False,
+                model_complexity=2,
+                min_detection_confidence=0.5,
+                min_tracking_confidence=0.5
+            )
+            self.mp_face = mp_face_mesh.FaceMesh(
+                static_image_mode=False,
+                max_num_faces=1,
+                min_detection_confidence=0.5,
+                min_tracking_confidence=0.5
+            )
+            self.mp_hands = mp_hands.Hands(
+                static_image_mode=False,
+                max_num_hands=2,
+                min_detection_confidence=0.5,
+                min_tracking_confidence=0.5
+            )
+
+            # Open camera
+            self._cap = cv2.VideoCapture(0)
+            if not self._cap.isOpened():
+                self.report({'ERROR'}, "Could not open camera.")
+                props.camera_preview_running = False
+                return {'CANCELLED'}
+
+            # Create Blender image datablock if needed
+            if self._img_name not in bpy.data.images:
+                bpy.data.images.new(self._img_name, width=640, height=480, alpha=True, float_buffer=True, generated_type='BLANK')
+            img = bpy.data.images[self._img_name]
+            img.generated_width = 640
+            img.generated_height = 480
+            img.colorspace_settings.name = 'sRGB'
+            img.use_fake_user = True
+
+            # Directly split and set image editor (no timer)
+            split_and_set_image_editor(self._img_name)
+
+            # Add timer
+            self._timer = context.window_manager.event_timer_add(1/30, window=context.window)
+            context.window_manager.modal_handler_add(self)
+
+            return {'RUNNING_MODAL'}
+        except Exception as e:
+            self.report({'ERROR'}, f"Failed to start camera preview: {e}")
             props.camera_preview_running = False
             return {'CANCELLED'}
-        # Create Blender image datablock if needed
-        if self._img_name not in bpy.data.images:
-            bpy.data.images.new(self._img_name, width=640, height=480, alpha=True, float_buffer=True)
-        img = bpy.data.images[self._img_name]
-        img.generated_width = 640
-        img.generated_height = 480
-        img.colorspace_settings.name = 'sRGB'
-        # Create plane if not present
-        if self._plane_name not in bpy.data.objects:
-            bpy.ops.mesh.primitive_plane_add(size=4, location=(0, -2, 1))
-            plane = context.active_object
-            plane.name = self._plane_name
-            plane.rotation_euler = (math.radians(90), 0, 0)
-        else:
-            plane = bpy.data.objects[self._plane_name]
-            plane.location = (0, -2, 1)
-            plane.rotation_euler = (math.radians(90), 0, 0)
-        # Create material if not present
-        if self._mat_name not in bpy.data.materials:
-            mat = bpy.data.materials.new(self._mat_name)
-            mat.use_nodes = True
-            bsdf = mat.node_tree.nodes.get('Principled BSDF')
-            tex_image = mat.node_tree.nodes.new('ShaderNodeTexImage')
-            tex_image.image = img
-            mat.node_tree.links.new(bsdf.inputs['Base Color'], tex_image.outputs['Color'])
-        else:
-            mat = bpy.data.materials[self._mat_name]
-            # Update image node if needed
-            tex_image = None
-            for node in mat.node_tree.nodes:
-                if node.type == 'TEX_IMAGE':
-                    tex_image = node
-                    break
-            if tex_image is None:
-                tex_image = mat.node_tree.nodes.new('ShaderNodeTexImage')
-                bsdf = mat.node_tree.nodes.get('Principled BSDF')
-                mat.node_tree.links.new(bsdf.inputs['Base Color'], tex_image.outputs['Color'])
-            tex_image.image = img
-        # Assign material to plane
-        if plane.data.materials:
-            plane.data.materials[0] = mat
-        else:
-            plane.data.materials.append(mat)
-        # Add modal timer
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(0.03, window=context.window)
-        wm.modal_handler_add(self)
-        self.report({'INFO'}, "Camera preview started. Switch to Material Preview or Rendered view to see the feed on the plane.")
-        return {'RUNNING_MODAL'}
 
     def cancel(self, context):
-        props = context.scene.animate_properties
-        props.camera_preview_running = False
+        if self._timer:
+            context.window_manager.event_timer_remove(self._timer)
         if self._cap:
             self._cap.release()
-        wm = context.window_manager
-        if self._timer:
-            wm.event_timer_remove(self._timer)
-        self._timer = None
-        self._cap = None
-        self.report({'INFO'}, "Camera preview stopped.")
-        return {'CANCELLED'}
+        if hasattr(self, 'mp_pose'):
+            self.mp_pose.close()
+        if hasattr(self, 'mp_face'):
+            self.mp_face.close()
+        if hasattr(self, 'mp_hands'):
+            self.mp_hands.close()
+        context.scene.animate_properties.camera_preview_running = False
 
 class ANIMATE_OT_stop_camera_preview(Operator):
     bl_idname = "animate.stop_camera_preview"
     bl_label = "Stop Camera Preview"
-    bl_description = "Stop the camera preview"
+    bl_description = "Stop camera preview"
 
     def execute(self, context):
         context.scene.animate_properties.camera_preview_running = False
