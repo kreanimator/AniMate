@@ -77,7 +77,7 @@ class BlenderRigMapper:
 
         # Convert landmarks to world space coordinates
         world_coords = {}
-        for i, landmark in enumerate(landmarks):
+        for i, landmark in enumerate(landmarks.landmark):
             # Convert from MediaPipe's coordinate system to Blender's
             world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
 
@@ -139,7 +139,7 @@ class BlenderRigMapper:
                 
             # Convert landmarks to world space
             world_coords = {}
-            for i, landmark in enumerate(landmarks):
+            for i, landmark in enumerate(landmarks.landmark):
                 world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
                 
             # Calculate rotation from landmarks
@@ -168,7 +168,7 @@ class BlenderRigMapper:
         
         # Convert landmarks to world space
         world_coords = {}
-        for i, landmark in enumerate(landmarks):
+        for i, landmark in enumerate(landmarks.landmark):
             world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
             
         # Process each finger
