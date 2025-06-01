@@ -24,7 +24,7 @@ git clone https://github.com/yourusername/AniMate.git
 cd AniMate
 ```
 
-2. Install dependencies:
+2. Install Python dependencies:
 ```bash
 pip install -r requirements.txt
 ```
@@ -32,12 +32,15 @@ pip install -r requirements.txt
 3. Install the Blender addon:
    - Open Blender
    - Go to Edit > Preferences > Add-ons
-   - Click "Install" and select the `addon` folder from this repository
+   - Click "Install" and select the `addon/__init__.py` file from this repository
+   - Enable the addon by checking the box next to "Animation: AniMate"
 
 ## Project Structure
 
 ```
 AniMate/
+├── addon/                  # Blender addon files
+│   └── __init__.py        # Addon initialization and UI
 ├── data/                   # Data and configuration files
 │   ├── bone_mappings.py    # MediaPipe to Blender bone mappings
 │   ├── landmark_structure.py # MediaPipe landmark definitions
@@ -57,9 +60,18 @@ AniMate/
 
 ## Usage
 
+### In Blender
+
+1. Open Blender and load your humanoid rig
+2. In the 3D Viewport, open the sidebar (N key)
+3. Go to the "AniMate" tab
+4. Select your armature in the "Target Armature" field
+5. Configure detection settings (pose, face, hands)
+6. Click "Start Capture" to begin motion capture
+
 ### Testing Detection
 
-To test the MediaPipe detection functionality:
+To test the MediaPipe detection functionality without Blender:
 
 ```bash
 python tests/test_detection.py
@@ -70,16 +82,6 @@ Controls:
 - 'f' - Toggle face detection
 - 'h' - Toggle hand detection
 - 'ESC' - Exit
-
-### Live Motion Capture
-
-To use the live motion capture with Blender:
-
-1. Open Blender
-2. Run the example script:
-```bash
-python examples/live_capture.py
-```
 
 ## Development
 
@@ -92,6 +94,10 @@ python examples/live_capture.py
 2. Rig Support:
    - Add new rig configurations in `data/test_rigs.py`
    - Implement rig-specific mapping in `rig/blender_mapper.py`
+
+3. Addon UI:
+   - Modify `addon/__init__.py` to add new UI elements
+   - Add new operators and properties as needed
 
 ### Testing
 
@@ -120,4 +126,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - MediaPipe for the motion capture technology
-- Blender for the 3D animation platform 
+- Blender for the 3D animation platform
