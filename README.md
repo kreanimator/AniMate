@@ -29,10 +29,15 @@ cd AniMate
 pip install -r requirements.txt
 ```
 
-3. Install the Blender addon:
+3. Create a ZIP file for the Blender addon:
+```bash
+zip -r animate_addon.zip animate_addon
+```
+
+4. Install the Blender addon:
    - Open Blender
    - Go to Edit > Preferences > Add-ons
-   - Click "Install" and select the `animate_addon` folder from this repository
+   - Click "Install" and select the `animate_addon.zip` file you just created
    - Enable the addon by checking the box next to "Animation: AniMate"
 
 ## Project Structure
