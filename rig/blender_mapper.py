@@ -1,17 +1,17 @@
+"""
+Blender rig mapper for motion capture.
+"""
 import bpy
 import math
 from mathutils import Vector, Matrix, Euler
-from data.bone_mappings import (
-    POSE_LANDMARKS_TO_BONES,
-    FACE_LANDMARKS_TO_BONES,
-    HAND_LANDMARKS_TO_BONES
-)
+from .mappings.mapping_factory import RigMappingFactory
 
 class BlenderRigMapper:
-    def __init__(self, armature_obj=None):
+    def __init__(self, armature_obj=None, rig_type='MIXAMO'):
         self.armature = armature_obj
         self.pose_bones = {}
         self.previous_rotations = {}
+        self.mapping = RigMappingFactory.create_mapping(rig_type)
         if armature_obj:
             self.setup_armature(armature_obj)
 
@@ -23,6 +23,27 @@ class BlenderRigMapper:
         
         # Store pose bones for quick access
         self.pose_bones = {bone.name: bone for bone in self.armature.pose.bones}
+        
+        # Verify bone hierarchy matches the mapping
+        self._verify_bone_hierarchy()
+
+    def _verify_bone_hierarchy(self):
+        """Verify that the armature's bone hierarchy matches the mapping."""
+        expected_hierarchy = self.mapping.get_bone_hierarchy()
+        actual_bones = {bone.name: bone for bone in self.armature.data.bones}
+        
+        def check_hierarchy(expected, parent=None):
+            for bone_name, children in expected.items():
+                if bone_name not in actual_bones:
+                    print(f"Warning: Expected bone '{bone_name}' not found in armature")
+                    continue
+                    
+                if parent and actual_bones[bone_name].parent != actual_bones[parent]:
+                    print(f"Warning: Bone '{bone_name}' has unexpected parent")
+                    
+                check_hierarchy(children, bone_name)
+        
+        check_hierarchy(expected_hierarchy)
 
     def calculate_bone_rotation(self, start_point, end_point, up_vector=Vector((0, 0, 1))):
         """Calculate bone rotation from two points"""
@@ -38,6 +59,17 @@ class BlenderRigMapper:
         rot_matrix = Matrix((x_axis, y_axis, z_axis)).to_4x4().transposed()
         return rot_matrix.to_euler()
 
+    def apply_rotation_limits(self, bone_name, rotation):
+        """Apply rotation limits to the bone."""
+        limits = self.mapping.get_bone_rotation_limits()
+        if bone_name in limits:
+            bone_limits = limits[bone_name]
+            for axis in ['x', 'y', 'z']:
+                if axis in bone_limits:
+                    min_val, max_val = bone_limits[axis]
+                    setattr(rotation, axis, max(min_val, min(max_val, getattr(rotation, axis))))
+        return rotation
+
     def process_pose_landmarks(self, landmarks):
         """Process pose landmarks and apply to armature"""
         if not self.armature or not landmarks:
@@ -49,8 +81,11 @@ class BlenderRigMapper:
             # Convert from MediaPipe's coordinate system to Blender's
             world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
 
+        # Get pose mapping for this rig type
+        pose_mapping = self.mapping.get_pose_mapping()
+        
         # Process each mapped bone
-        for bone_name, landmark_indices in POSE_LANDMARKS_TO_BONES.items():
+        for bone_name, landmark_indices in pose_mapping.items():
             if bone_name not in self.pose_bones:
                 continue
 
@@ -61,6 +96,15 @@ class BlenderRigMapper:
                 start_point = world_coords[landmark_indices[0]]
                 end_point = world_coords[landmark_indices[1]]
                 rotation = self.calculate_bone_rotation(start_point, end_point)
+                
+                # Apply rotation limits
+                rotation = self.apply_rotation_limits(bone_name, rotation)
+                
+                # Apply scale factor
+                scale_factor = self.mapping.get_bone_scale_factors().get(bone_name, 1.0)
+                rotation = Euler((rotation.x * scale_factor, 
+                                rotation.y * scale_factor, 
+                                rotation.z * scale_factor))
             else:
                 # Handle special cases (like single-point landmarks)
                 continue
@@ -85,15 +129,42 @@ class BlenderRigMapper:
         if not landmarks:
             return
         
-        # Implementation will depend on your face rig setup
-        pass
+        # Get face mapping for this rig type
+        face_mapping = self.mapping.get_face_mapping()
+        
+        # Process each mapped face bone
+        for bone_name, landmark_indices in face_mapping.items():
+            if bone_name not in self.pose_bones:
+                continue
+                
+            # Convert landmarks to world space
+            world_coords = {}
+            for i, landmark in enumerate(landmarks):
+                world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
+                
+            # Calculate rotation from landmarks
+            if len(landmark_indices) == 2:
+                start_point = world_coords[landmark_indices[0]]
+                end_point = world_coords[landmark_indices[1]]
+                rotation = self.calculate_bone_rotation(start_point, end_point)
+                
+                # Apply rotation limits and scale
+                rotation = self.apply_rotation_limits(bone_name, rotation)
+                scale_factor = self.mapping.get_bone_scale_factors().get(bone_name, 1.0)
+                rotation = Euler((rotation.x * scale_factor, 
+                                rotation.y * scale_factor, 
+                                rotation.z * scale_factor))
+                                
+                # Apply to bone
+                self.pose_bones[bone_name].rotation_euler = rotation
 
     def process_hand_landmarks(self, landmarks, is_right_hand=True):
         """Process hand landmarks and apply to hand rig"""
         if not landmarks:
             return
             
-        prefix = "right_" if is_right_hand else "left_"
+        # Get hand mapping for this rig type
+        hand_mapping = self.mapping.get_hand_mapping()
         
         # Convert landmarks to world space
         world_coords = {}
@@ -101,17 +172,26 @@ class BlenderRigMapper:
             world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
             
         # Process each finger
-        for finger_name, joint_indices in HAND_LANDMARKS_TO_BONES.items():
-            for i in range(len(joint_indices) - 1):
-                bone_name = f"{prefix}{finger_name}_{i}"
-                if bone_name not in self.pose_bones:
-                    continue
-                    
-                start_point = world_coords[joint_indices[i]]
-                end_point = world_coords[joint_indices[i + 1]]
+        for finger_name, joint_indices in hand_mapping.items():
+            # Adjust bone name based on hand side
+            bone_name = finger_name.replace('.L', '.R') if is_right_hand else finger_name
+            if bone_name not in self.pose_bones:
+                continue
+                
+            # Calculate rotation from landmarks
+            if len(joint_indices) == 2:
+                start_point = world_coords[joint_indices[0]]
+                end_point = world_coords[joint_indices[1]]
                 rotation = self.calculate_bone_rotation(start_point, end_point)
                 
-                # Apply rotation to finger bone
+                # Apply rotation limits and scale
+                rotation = self.apply_rotation_limits(bone_name, rotation)
+                scale_factor = self.mapping.get_bone_scale_factors().get(bone_name, 1.0)
+                rotation = Euler((rotation.x * scale_factor, 
+                                rotation.y * scale_factor, 
+                                rotation.z * scale_factor))
+                                
+                # Apply to bone
                 self.pose_bones[bone_name].rotation_euler = rotation
 
     @staticmethod
