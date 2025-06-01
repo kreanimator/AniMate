@@ -7,61 +7,83 @@ class MixamoMapping(BaseRigMapping):
     """Mapping implementation for Mixamo rigs."""
     
     def get_pose_mapping(self):
+        # MediaPipe Pose indices: https://google.github.io/mediapipe/solutions/pose.html#pose-landmark-model-blazepose-ghum-3d
         return {
-            # Spine
-            'Spine': [11, 23],  # Shoulder to Hip
-            'Spine1': [23, 24],  # Hip to Hip
-            'Spine2': [24, 12],  # Hip to Shoulder
-            
-            # Head
-            'Neck': [11, 0],  # Shoulder to Nose
-            'Head': [0, 8],  # Nose to Forehead
-            
-            # Left Arm
-            'LeftShoulder': [11, 13],  # Shoulder to Elbow
-            'LeftArm': [13, 15],  # Elbow to Wrist
-            
+            # Hips and Spine
+            'Hips': [23, 24],  # left_hip to right_hip
+            'Spine': [23, 11],  # left_hip to left_shoulder
+            'Spine1': [11, 12],  # left_shoulder to right_shoulder
+            'Spine2': [12, 0],  # right_shoulder to nose (approximate upper spine)
+            'Neck': [0, 1],  # nose to left_eye_inner (approximate neck)
+            'Head': [0, 8],  # nose to forehead (approximate)
+            'HeadTop_End': [8, 8],  # forehead (no landmark for head top, so repeat)
+
             # Right Arm
-            'RightShoulder': [12, 14],  # Shoulder to Elbow
-            'RightArm': [14, 16],  # Elbow to Wrist
-            
-            # Left Leg
-            'LeftUpLeg': [23, 25],  # Hip to Knee
-            'LeftLeg': [25, 27],  # Knee to Ankle
-            'LeftFoot': [27, 31],  # Ankle to Heel
-            
+            'RightShoulder': [12, 14],  # right_shoulder to right_elbow
+            'RightArm': [14, 16],  # right_elbow to right_wrist
+            'RightForeArm': [14, 16],  # same as above (no separate landmark)
+            'RightHand': [16, 16],  # right_wrist (single point)
+
+            # Left Arm
+            'LeftShoulder': [11, 13],  # left_shoulder to left_elbow
+            'LeftArm': [13, 15],  # left_elbow to left_wrist
+            'LeftForeArm': [13, 15],  # same as above
+            'LeftHand': [15, 15],  # left_wrist
+
             # Right Leg
-            'RightUpLeg': [24, 26],  # Hip to Knee
-            'RightLeg': [26, 28],  # Knee to Ankle
-            'RightFoot': [28, 32],  # Ankle to Heel
+            'RightUpLeg': [24, 26],  # right_hip to right_knee
+            'RightLeg': [26, 28],  # right_knee to right_ankle
+            'RightFoot': [28, 32],  # right_ankle to right_heel
+            'RightToeBase': [32, 32],  # right_heel (no separate toe landmark)
+            'RightToe_End': [32, 32],  # right_heel (repeat, or remove if not needed)
+
+            # Left Leg
+            'LeftUpLeg': [23, 25],  # left_hip to left_knee
+            'LeftLeg': [25, 27],  # left_knee to left_ankle
+            'LeftFoot': [27, 31],  # left_ankle to left_heel
+            'LeftToeBase': [31, 31],  # left_heel
+            'LeftToe_End': [31, 31],  # left_heel
         }
     
     def get_hand_mapping(self):
+        # MediaPipe Hands indices: https://google.github.io/mediapipe/solutions/hands.html#hand-landmark-model
+        # Thumb: 1-2-3-4, Index: 5-6-7-8, Middle: 9-10-11-12, Ring: 13-14-15-16, Pinky: 17-18-19-20
+        # Wrist: 0
         return {
-            # Thumb
-            'Thumb1': [0, 1],
-            'Thumb2': [1, 2],
-            'Thumb3': [2, 3],
-            
-            # Index
-            'Index1': [0, 5],
-            'Index2': [5, 6],
-            'Index3': [6, 7],
-            
-            # Middle
-            'Middle1': [0, 9],
-            'Middle2': [9, 10],
-            'Middle3': [10, 11],
-            
-            # Ring
-            'Ring1': [0, 13],
-            'Ring2': [13, 14],
-            'Ring3': [14, 15],
-            
-            # Pinky
-            'Pinky1': [0, 17],
-            'Pinky2': [17, 18],
-            'Pinky3': [18, 19]
+            # Right hand (use same for left, code will swap as needed)
+            'RightHand': [0, 0],  # wrist
+            'RightHandThumb1': [1, 2],
+            'RightHandThumb2': [2, 3],
+            'RightHandThumb3': [3, 4],
+            'RightHandIndex1': [5, 6],
+            'RightHandIndex2': [6, 7],
+            'RightHandIndex3': [7, 8],
+            'RightHandMiddle1': [9, 10],
+            'RightHandMiddle2': [10, 11],
+            'RightHandMiddle3': [11, 12],
+            'RightHandRing1': [13, 14],
+            'RightHandRing2': [14, 15],
+            'RightHandRing3': [15, 16],
+            'RightHandPinky1': [17, 18],
+            'RightHandPinky2': [18, 19],
+            'RightHandPinky3': [19, 20],
+            # Left hand (same indices, code will handle side)
+            'LeftHand': [0, 0],
+            'LeftHandThumb1': [1, 2],
+            'LeftHandThumb2': [2, 3],
+            'LeftHandThumb3': [3, 4],
+            'LeftHandIndex1': [5, 6],
+            'LeftHandIndex2': [6, 7],
+            'LeftHandIndex3': [7, 8],
+            'LeftHandMiddle1': [9, 10],
+            'LeftHandMiddle2': [10, 11],
+            'LeftHandMiddle3': [11, 12],
+            'LeftHandRing1': [13, 14],
+            'LeftHandRing2': [14, 15],
+            'LeftHandRing3': [15, 16],
+            'LeftHandPinky1': [17, 18],
+            'LeftHandPinky2': [18, 19],
+            'LeftHandPinky3': [19, 20],
         }
     
     def get_face_mapping(self):
