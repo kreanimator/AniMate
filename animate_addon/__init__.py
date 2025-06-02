@@ -69,6 +69,7 @@ import bpy.app.timers
 import cv2
 import mediapipe as mp
 import numpy as np
+from bpy.app.handlers import persistent
 
 # Initialize MediaPipe solutions
 mp_pose = mp.solutions.pose
@@ -85,6 +86,12 @@ def get_rig_types(self, context):
         # Add more rig types here in the future
     ]
 
+def update_rig_type(self, context):
+    if self.rig_type == 'MIXAMO':
+        self.enable_face = False
+    elif self.rig_type in {'RIGIFY', 'MAYA'}:
+        self.enable_face = True
+
 class AniMateProperties(PropertyGroup):
     """Properties for the AniMate addon."""
     enable_pose: BoolProperty(
@@ -95,12 +102,12 @@ class AniMateProperties(PropertyGroup):
     enable_face: BoolProperty(
         name="Enable Face",
         description="Enable face detection",
-        default=True
+        default=False
     )
     enable_hands: BoolProperty(
         name="Enable Hands",
         description="Enable hand detection",
-        default=True
+        default=False
     )
     show_camera_preview: BoolProperty(
         name="Show Camera Preview",
@@ -121,7 +128,8 @@ class AniMateProperties(PropertyGroup):
             ('RIGIFY', 'Rigify', 'Blender Rigify Rig'),
             ('MAYA', 'Maya', 'Maya Rig'),
         ],
-        default='MIXAMO'
+        default='MIXAMO',
+        update=update_rig_type
     )
     camera_preview_running: BoolProperty(
         name="Camera Preview Running",
@@ -146,7 +154,6 @@ class ANIMATE_PT_main_panel(Panel):
     def draw(self, context):
         layout = self.layout
         props = context.scene.animate_properties
-
         # Rig type dropdown
         layout.prop(props, "rig_type")
 
@@ -157,8 +164,26 @@ class ANIMATE_PT_main_panel(Panel):
         box = layout.box()
         box.label(text="Detection Settings:")
         box.prop(props, "enable_pose")
-        box.prop(props, "enable_face")
-        box.prop(props, "enable_hands")
+
+        # --- Capabilities logic ---
+        from rig.mappings.mapping_factory import RigMappingFactory
+        rig_type = props.rig_type
+        mapping = RigMappingFactory.create_mapping(rig_type)
+        capabilities = mapping.get_capabilities()
+        # Face toggle
+        if not capabilities.get('face', False):
+            row = box.row()
+            row.enabled = False
+            row.prop(props, "enable_face", text="Enable Face")
+        else:
+            box.prop(props, "enable_face")
+        # Hands toggle
+        if not capabilities.get('hands', False):
+            row = box.row()
+            row.enabled = False
+            row.prop(props, "enable_hands", text="Enable Hands")
+        else:
+            box.prop(props, "enable_hands")
 
 class ANIMATE_PT_camera_preview(Panel):
     bl_label = "Camera Preview"
@@ -404,6 +429,12 @@ class ANIMATE_OT_stop_capture(Operator):
         context.scene.animate_running = False
         return {'FINISHED'}
 
+@persistent
+def animate_sync_rig_type(scene):
+    props = scene.animate_properties
+    if hasattr(props, 'rig_type') and hasattr(props, 'enable_face'):
+        update_rig_type(props, bpy.context)
+
 classes = (
     AniMateProperties,
     ANIMATE_PT_main_panel,
@@ -418,6 +449,7 @@ def register():
         bpy.utils.register_class(cls)
     bpy.types.Scene.animate_properties = PointerProperty(type=AniMateProperties)
     bpy.types.Scene.animate_running = BoolProperty(default=False)
+    bpy.app.handlers.load_post.append(animate_sync_rig_type)
 
 def unregister():
     """Unregister the addon."""
@@ -425,6 +457,8 @@ def unregister():
         bpy.utils.unregister_class(cls)
     del bpy.types.Scene.animate_properties
     del bpy.types.Scene.animate_running
+    if animate_sync_rig_type in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(animate_sync_rig_type)
 
 if __name__ == "__main__":
     register() 
