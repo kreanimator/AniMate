@@ -1,5 +1,6 @@
 """
-Blender rig mapper for motion capture.
+IMPORTANT: The mesh and armature must be upright (Z up) and in T-pose before starting capture.
+If your mesh is lying down, apply rotation and scale in Object Mode (Ctrl+A) to both the armature and mesh.
 """
 import bpy
 import math
@@ -21,11 +22,31 @@ class BlenderRigMapper:
     def __init__(self, armature_obj=None, rig_type='MIXAMO'):
         print(f"[AniMateRigMapper] Creating BlenderRigMapper for rig_type={rig_type}")
         self.armature = armature_obj
-        self.pose_bones = {}
-        self.previous_rotations = {}
+        self.driver_objects = {}  # Store driver objects
         self.mapping = RigMappingFactory.create_mapping(rig_type)
         self.prefix = ''
-        self.upper_body_only = True  # Set to True to only update upper body
+        self.blend_to_rest_pose = False  # Option to blend to rest pose if data missing
+        # Per-bone axis correction for Mixamo left hand (template for right hand)
+        self.axis_corrections = {
+            'mixamorig:LeftHand': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:RightHand': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandThumb1': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandThumb2': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandThumb3': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandIndex1': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandIndex2': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandIndex3': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandMiddle1': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandMiddle2': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandMiddle3': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandRing1': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandRing2': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandRing3': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandPinky1': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandPinky2': lambda e: Euler((e.x, e.z, -e.y)),
+            'mixamorig:LeftHandPinky3': lambda e: Euler((e.x, e.z, -e.y)),
+            # Add for right hand fingers as needed
+        }
         if armature_obj:
             self.setup_armature(armature_obj)
 
@@ -62,6 +83,50 @@ class BlenderRigMapper:
         
         # Verify bone hierarchy matches the mapping
         self._verify_bone_hierarchy()
+
+    def _create_driver_objects(self):
+        """Create empty objects to drive bone rotations and add constraints. Store rest pose offsets."""
+        # Remove old driver objects
+        for obj in list(bpy.data.objects):
+            if obj.name.startswith("Driver_"):
+                bpy.data.objects.remove(obj, do_unlink=True)
+        # Remove old AniMate constraints
+        if self.armature:
+            for pose_bone in self.armature.pose.bones:
+                for c in list(pose_bone.constraints):
+                    if c.name.startswith("AniMate_CopyRot"):
+                        pose_bone.constraints.remove(c)
+        driver_collection = bpy.data.collections.get("AniMate_Drivers")
+        if not driver_collection:
+            driver_collection = bpy.data.collections.new("AniMate_Drivers")
+            bpy.context.scene.collection.children.link(driver_collection)
+        self.rest_pose_rotations = {}  # Store rest pose rotation for each bone
+        self.driver_objects = {}
+        for bone in self.armature.data.bones:
+            driver_name = f"Driver_{bone.name}"
+            driver = bpy.data.objects.new(driver_name, None)
+            driver_collection.objects.link(driver)
+            driver.parent = self.armature
+            driver.parent_type = 'OBJECT'
+            driver.location = bone.head_local
+            self.driver_objects[bone.name] = driver
+            if bone.name in self.armature.pose.bones:
+                pose_bone = self.armature.pose.bones[bone.name]
+                self.rest_pose_rotations[bone.name] = pose_bone.matrix.to_euler()
+                # Add Copy Rotation constraint
+                constraint = pose_bone.constraints.new(type='COPY_ROTATION')
+                constraint.name = f"AniMate_CopyRot_{bone.name}"
+                constraint.target = driver
+                # Use LOCAL/LOCAL for Mixamo hand and finger bones
+                if bone.name.startswith('mixamorig:LeftHand') or bone.name.startswith('mixamorig:RightHand'):
+                    constraint.target_space = 'LOCAL'
+                    constraint.owner_space = 'LOCAL'
+                    print(f"[DEBUG] Constraint for {bone.name}: LOCAL/LOCAL")
+                else:
+                    constraint.target_space = 'WORLD'
+                    constraint.owner_space = 'POSE'
+                constraint.mix_mode = 'REPLACE'
+                print(f"[DEBUG] Created driver and constraint for {bone.name}")
 
     def _verify_bone_hierarchy(self):
         """Verify that the armature's bone hierarchy matches the mapping."""
@@ -106,62 +171,48 @@ class BlenderRigMapper:
                     setattr(rotation, axis, max(min_val, min(max_val, getattr(rotation, axis))))
         return rotation
 
+    def _remap_axes(self, euler):
+        """Remap axes from MediaPipe to Blender for Mixamo: swap Y and Z, invert new Z."""
+        return Euler((euler.x, euler.z, -euler.y))
+
+    def get_axis_correction(self, bone_name):
+        """Get the axis correction function for a bone, or identity if not specified."""
+        full_bone_name = self.prefix + bone_name
+        return self.axis_corrections.get(full_bone_name, lambda e: e)
+
     def process_pose_landmarks(self, landmarks):
-        """Process pose landmarks and apply to armature"""
+        """Process pose landmarks and apply to driver objects with region-based isolation."""
         if not self.armature or not landmarks:
             print("[AniMateRigMapper] WARNING: No armature or landmarks for pose processing.")
             return
-
-        # Convert landmarks to world space coordinates
         world_coords = {}
         for i, landmark in enumerate(landmarks.landmark):
-            world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
-
+            if hasattr(landmark, 'visibility') and landmark.visibility > 0.5:
+                world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
         pose_mapping = self.mapping.get_pose_mapping()
-
-        # Expanded upper body and hand/finger bones
-        upper_body_bones = [
-            "Spine", "Spine1", "Spine2", "Neck", "Head", "HeadTop_End",
-            "RightShoulder", "RightArm", "RightForeArm", "RightHand",
-            "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
-            # Right hand fingers
-            "RightHandThumb1", "RightHandThumb2", "RightHandThumb3",
-            "RightHandIndex1", "RightHandIndex2", "RightHandIndex3",
-            "RightHandMiddle1", "RightHandMiddle2", "RightHandMiddle3",
-            "RightHandRing1", "RightHandRing2", "RightHandRing3",
-            "RightHandPinky1", "RightHandPinky2", "RightHandPinky3",
-            # Left hand fingers
-            "LeftHandThumb1", "LeftHandThumb2", "LeftHandThumb3",
-            "LeftHandIndex1", "LeftHandIndex2", "LeftHandIndex3",
-            "LeftHandMiddle1", "LeftHandMiddle2", "LeftHandMiddle3",
-            "LeftHandRing1", "LeftHandRing2", "LeftHandRing3",
-            "LeftHandPinky1", "LeftHandPinky2", "LeftHandPinky3"
-        ]
-
         for bone_name, landmark_indices in pose_mapping.items():
             full_bone_name = self.prefix + bone_name
-            if full_bone_name not in self.pose_bones:
+            if full_bone_name not in self.driver_objects:
                 continue
-
-            # Only update if all required landmark indices are present
-            if any(idx not in world_coords for idx in landmark_indices):
-                # Special handling for head/neck: keep last known good rotation
-                if bone_name in ["Head", "Neck"] and bone_name in self.previous_rotations:
-                    quat = self.previous_rotations[bone_name].to_quaternion()
-                    self.pose_bones[full_bone_name].rotation_quaternion = quat
-                continue
-
-            # (Optional) Only update upper body bones if in upper_body_only mode
-            if getattr(self, "upper_body_only", False):
-                if bone_name not in upper_body_bones:
-                    continue
-
-            # Lock hips if not enough data
+            # Region-based isolation logic
             if bone_name == "Hips":
-                if not (23 in world_coords and 24 in world_coords):
+                required = [11, 12, 23, 24]
+                if any(idx not in world_coords for idx in required):
                     continue
-            
-            # Calculate bone orientation from landmarks
+            if bone_name in ["Spine", "Spine1", "Spine2"]:
+                required = [11, 12]
+                if any(idx not in world_coords for idx in required):
+                    continue
+            if bone_name in ["Neck", "Head"]:
+                required = [0, 2, 8]
+                if any(idx not in world_coords for idx in required):
+                    continue
+            if any(idx not in world_coords for idx in landmark_indices):
+                if self.blend_to_rest_pose:
+                    driver = self.driver_objects[full_bone_name]
+                    rest_rot = self.rest_pose_rotations.get(bone_name, Euler((0, 0, 0)))
+                    driver.rotation_euler = driver.rotation_euler.lerp(rest_rot, 0.2)
+                continue
             if len(landmark_indices) == 2:
                 start_point = world_coords[landmark_indices[0]]
                 end_point = world_coords[landmark_indices[1]]
@@ -169,139 +220,94 @@ class BlenderRigMapper:
                 rotation = self.apply_rotation_limits(bone_name, rotation)
                 scale_factor = self.mapping.get_bone_scale_factors().get(bone_name, 1.0)
                 rotation = Euler((rotation.x * scale_factor, rotation.y * scale_factor, rotation.z * scale_factor))
-            else:
-                continue
-
-            # Smoothing
-            if bone_name in self.previous_rotations:
-                smoothing = 0.5
-                rotation = Euler((
-                    self.lerp(self.previous_rotations[bone_name].x, rotation.x, smoothing),
-                    self.lerp(self.previous_rotations[bone_name].y, rotation.y, smoothing),
-                    self.lerp(self.previous_rotations[bone_name].z, rotation.z, smoothing)
-                ))
-
-            self.previous_rotations[bone_name] = rotation
-            quat = rotation.to_quaternion()
-            self.pose_bones[full_bone_name].rotation_quaternion = quat
+                rotation = self._remap_axes(rotation)
+                rest_rot = self.rest_pose_rotations.get(bone_name, Euler((0, 0, 0)))
+                corrected_rot = (rest_rot.to_matrix().inverted() @ rotation.to_matrix()).to_euler()
+                driver = self.driver_objects[full_bone_name]
+                print(f"[DEBUG] Setting {full_bone_name} driver rotation: {corrected_rot}")
+                driver.rotation_euler = corrected_rot
 
     def process_face_landmarks(self, landmarks):
-        """Process face landmarks and apply to face rig/shape keys"""
+        """Process face landmarks and apply to face driver objects (isolation: only if face landmarks present)."""
         if not landmarks:
             print("[AniMateRigMapper] WARNING: No landmarks for face processing.")
             return
-        
-        # Get face mapping for this rig type
         face_mapping = self.mapping.get_face_mapping()
-        
-        # Process each mapped face bone
+        world_coords = {}
+        for i, landmark in enumerate(landmarks.landmark):
+            if hasattr(landmark, 'visibility') and landmark.visibility > 0.5:
+                world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
         for bone_name, landmark_indices in face_mapping.items():
             full_bone_name = self.prefix + bone_name
-            if full_bone_name not in self.pose_bones:
-                print(f"[AniMateRigMapper] WARNING: Face bone not found in armature: {full_bone_name}")
+            if full_bone_name not in self.driver_objects:
                 continue
-                
-            # Convert landmarks to world space
-            world_coords = {}
-            for i, landmark in enumerate(landmarks.landmark):
-                world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
-                
-            # Calculate rotation from landmarks
+            if any(idx not in world_coords for idx in landmark_indices):
+                continue
             if len(landmark_indices) == 2:
                 start_point = world_coords[landmark_indices[0]]
                 end_point = world_coords[landmark_indices[1]]
                 rotation = self.calculate_bone_rotation(start_point, end_point)
-                
-                # Apply rotation limits and scale
                 rotation = self.apply_rotation_limits(bone_name, rotation)
                 scale_factor = self.mapping.get_bone_scale_factors().get(bone_name, 1.0)
-                rotation = Euler((rotation.x * scale_factor, 
-                                rotation.y * scale_factor, 
-                                rotation.z * scale_factor))
-                                
-                # Apply to bone
-                print(f"[AniMateRigMapper] Updating face bone: {full_bone_name} with rotation {rotation}")
-                self.pose_bones[full_bone_name].rotation_euler = rotation
+                rotation = Euler((rotation.x * scale_factor, rotation.y * scale_factor, rotation.z * scale_factor))
+                rotation = self._remap_axes(rotation)
+                rest_rot = self.rest_pose_rotations.get(bone_name, Euler((0, 0, 0)))
+                corrected_rot = (rest_rot.to_matrix().inverted() @ rotation.to_matrix()).to_euler()
+                driver = self.driver_objects[full_bone_name]
+                print(f"[DEBUG] Setting {full_bone_name} driver rotation: {corrected_rot}")
+                driver.rotation_euler = corrected_rot
 
     def process_hand_landmarks(self, landmarks, is_right_hand=True):
-        """Process hand landmarks and apply to hand rig"""
+        """Process hand landmarks and apply to hand driver objects (isolation: only if hand landmarks present)."""
         if not landmarks:
             print("[AniMateRigMapper] WARNING: No landmarks for hand processing.")
             return
-            
-        # Get hand mapping for this rig type
         hand_mapping = self.mapping.get_hand_mapping()
-        
-        # Convert landmarks to world space
         world_coords = {}
         for i, landmark in enumerate(landmarks.landmark):
-            world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
-            
-        # Process each finger
+            if hasattr(landmark, 'visibility') and landmark.visibility > 0.5:
+                world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
         for finger_name, joint_indices in hand_mapping.items():
-            # Adjust bone name based on hand side
-            bone_name = finger_name.replace('.L', '.R') if is_right_hand else finger_name
-            full_bone_name = self.prefix + bone_name
-            if full_bone_name not in self.pose_bones:
-                print(f"[AniMateRigMapper] WARNING: Hand bone not found in armature: {full_bone_name}")
+            if is_right_hand and not finger_name.endswith('.R'):
                 continue
-                
-            # Calculate rotation from landmarks
+            if not is_right_hand and not finger_name.endswith('.L'):
+                continue
+            bone_name = finger_name
+            full_bone_name = self.prefix + bone_name
+            if full_bone_name not in self.driver_objects:
+                continue
+            if any(idx not in world_coords for idx in joint_indices):
+                continue
             if len(joint_indices) == 2:
                 start_point = world_coords[joint_indices[0]]
                 end_point = world_coords[joint_indices[1]]
                 rotation = self.calculate_bone_rotation(start_point, end_point)
-                
-                # Apply rotation limits and scale
                 rotation = self.apply_rotation_limits(bone_name, rotation)
                 scale_factor = self.mapping.get_bone_scale_factors().get(bone_name, 1.0)
-                rotation = Euler((rotation.x * scale_factor, 
-                                rotation.y * scale_factor, 
-                                rotation.z * scale_factor))
-                                
-                # Apply to bone
-                print(f"[AniMateRigMapper] Updating hand bone: {full_bone_name} with rotation {rotation}")
-                self.pose_bones[full_bone_name].rotation_euler = rotation
-
-    @staticmethod
-    def lerp(a, b, t):
-        """Linear interpolation between two values"""
-        return a + (b - a) * t
+                rotation = Euler((rotation.x * scale_factor, rotation.y * scale_factor, rotation.z * scale_factor))
+                axis_correction_fn = self.get_axis_correction(bone_name)
+                corrected_rot = axis_correction_fn(rotation)
+                driver = self.driver_objects[full_bone_name]
+                print(f"[DEBUG] Setting {full_bone_name} driver rotation: {corrected_rot}")
+                driver.rotation_euler = corrected_rot
 
     def update_rig(self, pose_landmarks=None, face_landmarks=None, left_hand_landmarks=None, right_hand_landmarks=None):
-        """Update the entire rig with new landmark data"""
+        """Update the entire rig with new landmark data, processing both hands independently."""
         if not self.armature:
             return
 
-        # Ensure we're in pose mode
-        if self.armature.mode != 'POSE':
-            bpy.ops.object.mode_set(mode='POSE')
-
-        # Get the pose data
-        pose = self.armature.pose
-
+        # Process all landmark types
         if pose_landmarks:
             self.process_pose_landmarks(pose_landmarks)
         if face_landmarks:
             self.process_face_landmarks(face_landmarks)
-        # Ensure hand landmarks are processed if available
         if left_hand_landmarks:
             self.process_hand_landmarks(left_hand_landmarks, is_right_hand=False)
         if right_hand_landmarks:
             self.process_hand_landmarks(right_hand_landmarks, is_right_hand=True)
         
-        # Get current frame
-        current_frame = bpy.context.scene.frame_current
-        
-        # Update the pose using quaternions and insert keyframes
-        for bone in pose.bones:
-            quat = bone.rotation_quaternion
-            bone.rotation_quaternion = quat
-            bone.keyframe_insert(data_path="rotation_quaternion", frame=current_frame)
-        
+        # Update viewport
         bpy.context.view_layer.update()
-        bpy.context.scene.frame_set(current_frame)
-        bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
         for window in bpy.context.window_manager.windows:
             for area in window.screen.areas:
                 if area.type == 'VIEW_3D':
