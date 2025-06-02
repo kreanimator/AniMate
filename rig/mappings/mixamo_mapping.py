@@ -2,6 +2,9 @@
 Mixamo rig mapping implementation.
 """
 from .base_mappings import BaseRigMapping
+from mathutils import Vector, Matrix, Euler
+
+
 
 class MixamoMapping(BaseRigMapping):
     """Mapping for Mixamo rigs."""
@@ -189,4 +192,48 @@ class MixamoMapping(BaseRigMapping):
         return {
             'face': False,
             'hands': True,
-        } 
+        }
+
+    def get_axis_corrections(self):
+        return {
+            # Torso
+            'mixamorig:Hips': lambda e: Euler((e.x, e.y, e.z)),
+            'mixamorig:Spine': lambda e: Euler((e.x, e.y, e.z)),
+            'mixamorig:Spine1': lambda e: Euler((e.x, e.y, e.z)),
+            'mixamorig:Spine2': lambda e: Euler((e.x, e.y, e.z)),
+            'mixamorig:Neck': lambda e: Euler((e.x, e.y, e.z)),
+            'mixamorig:Head': lambda e: Euler((e.x, e.y, e.z)),
+            'mixamorig:HeadTop_End': lambda e: Euler((e.x, e.y, e.z)),
+            # Shoulders
+            'mixamorig:RightShoulder': lambda e: Euler((e.x, e.y, e.z)),
+            'mixamorig:LeftShoulder': lambda e: Euler((e.x, e.y, e.z)),
+            # Arms (swap/invert Y as a starting point)
+            'mixamorig:RightArm': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:RightForeArm': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:RightHand': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:LeftArm': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:LeftForeArm': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:LeftHand': lambda e: Euler((e.x, -e.y, e.z)),
+            # Fingers (identity, tune as needed)
+            **{f'mixamorig:RightHandThumb{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
+            **{f'mixamorig:RightHandIndex{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
+            **{f'mixamorig:RightHandMiddle{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
+            **{f'mixamorig:RightHandRing{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
+            **{f'mixamorig:RightHandPinky{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
+            **{f'mixamorig:LeftHandThumb{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
+            **{f'mixamorig:LeftHandIndex{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
+            **{f'mixamorig:LeftHandMiddle{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
+            **{f'mixamorig:LeftHandRing{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
+            **{f'mixamorig:LeftHandPinky{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
+            # Legs (swap/invert Y as a starting point)
+            'mixamorig:RightUpLeg': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:RightLeg': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:RightFoot': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:RightToeBase': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:RightToe_End': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:LeftUpLeg': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:LeftLeg': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:LeftFoot': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:LeftToeBase': lambda e: Euler((e.x, -e.y, e.z)),
+            'mixamorig:LeftToe_End': lambda e: Euler((e.x, -e.y, e.z)),
+        }
