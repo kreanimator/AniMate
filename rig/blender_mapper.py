@@ -25,6 +25,7 @@ class BlenderRigMapper:
         self.previous_rotations = {}
         self.mapping = RigMappingFactory.create_mapping(rig_type)
         self.prefix = ''
+        self.upper_body_only = True  # Set to True to only update upper body
         if armature_obj:
             self.setup_armature(armature_obj)
 
@@ -114,53 +115,57 @@ class BlenderRigMapper:
         # Convert landmarks to world space coordinates
         world_coords = {}
         for i, landmark in enumerate(landmarks.landmark):
-            # Convert from MediaPipe's coordinate system to Blender's
             world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
 
-        # Get pose mapping for this rig type
         pose_mapping = self.mapping.get_pose_mapping()
-        
-        # Process each mapped bone
+
         for bone_name, landmark_indices in pose_mapping.items():
             full_bone_name = self.prefix + bone_name
             if full_bone_name not in self.pose_bones:
-                print(f"[AniMateRigMapper] WARNING: Bone not found in armature: {full_bone_name}")
                 continue
-            bone = self.pose_bones[full_bone_name]
-            
+
+            # Only update if all required landmark indices are present
+            if any(idx not in world_coords for idx in landmark_indices):
+                continue
+
+            # (Optional) Only update upper body bones if in upper_body_only mode
+            if getattr(self, "upper_body_only", False):
+                upper_body_bones = [
+                    "Spine", "Spine1", "Spine2", "Neck", "Head", "HeadTop_End",
+                    "RightShoulder", "RightArm", "RightForeArm", "RightHand",
+                    "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand"
+                ]
+                if bone_name not in upper_body_bones:
+                    continue
+
+            # Lock hips if not enough data
+            if bone_name == "Hips":
+                if not (23 in world_coords and 24 in world_coords):
+                    continue
+
             # Calculate bone orientation from landmarks
             if len(landmark_indices) == 2:
                 start_point = world_coords[landmark_indices[0]]
                 end_point = world_coords[landmark_indices[1]]
                 rotation = self.calculate_bone_rotation(start_point, end_point)
-                
-                # Apply rotation limits
                 rotation = self.apply_rotation_limits(bone_name, rotation)
-                
-                # Apply scale factor
                 scale_factor = self.mapping.get_bone_scale_factors().get(bone_name, 1.0)
-                rotation = Euler((rotation.x * scale_factor, 
-                                rotation.y * scale_factor, 
-                                rotation.z * scale_factor))
+                rotation = Euler((rotation.x * scale_factor, rotation.y * scale_factor, rotation.z * scale_factor))
             else:
-                # Handle special cases (like single-point landmarks)
                 continue
 
-            # Apply rotation with smoothing
+            # Smoothing
             if bone_name in self.previous_rotations:
-                smoothing = 0.5  # Adjust smoothing factor as needed
+                smoothing = 0.5
                 rotation = Euler((
                     self.lerp(self.previous_rotations[bone_name].x, rotation.x, smoothing),
                     self.lerp(self.previous_rotations[bone_name].y, rotation.y, smoothing),
                     self.lerp(self.previous_rotations[bone_name].z, rotation.z, smoothing)
                 ))
 
-            # Store rotation for next frame
             self.previous_rotations[bone_name] = rotation
-            
-            # Apply rotation to bone
-            print(f"[AniMateRigMapper] Updating bone: {full_bone_name} with rotation {rotation}")
-            bone.rotation_euler = rotation
+            quat = rotation.to_quaternion()
+            self.pose_bones[full_bone_name].rotation_quaternion = quat
 
     def process_face_landmarks(self, landmarks):
         """Process face landmarks and apply to face rig/shape keys"""
@@ -247,6 +252,16 @@ class BlenderRigMapper:
 
     def update_rig(self, pose_landmarks=None, face_landmarks=None, left_hand_landmarks=None, right_hand_landmarks=None):
         """Update the entire rig with new landmark data"""
+        if not self.armature:
+            return
+
+        # Ensure we're in pose mode
+        if self.armature.mode != 'POSE':
+            bpy.ops.object.mode_set(mode='POSE')
+
+        # Get the pose data
+        pose = self.armature.pose
+
         if pose_landmarks:
             self.process_pose_landmarks(pose_landmarks)
         if face_landmarks:
@@ -256,5 +271,28 @@ class BlenderRigMapper:
         if right_hand_landmarks:
             self.process_hand_landmarks(right_hand_landmarks, is_right_hand=True)
         
-        # Ensure the viewport updates
-        bpy.context.view_layer.update() 
+        # Get current frame
+        current_frame = bpy.context.scene.frame_current
+        
+        # Update the pose using quaternions and insert keyframes
+        for bone in pose.bones:
+            # Convert current rotation to quaternion
+            quat = bone.rotation_quaternion
+            # Force update by setting the same quaternion
+            bone.rotation_quaternion = quat
+            # Insert keyframe for rotation
+            bone.keyframe_insert(data_path="rotation_quaternion", frame=current_frame)
+            
+        # Force viewport update
+        bpy.context.view_layer.update()
+        bpy.context.scene.frame_set(current_frame)
+        
+        # Force GUI update
+        bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
+        
+        # Redraw all 3D views
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == 'VIEW_3D':
+                    area.tag_redraw() 
+                    
