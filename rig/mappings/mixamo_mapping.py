@@ -212,4 +212,10 @@ class MixamoMapping(BaseRigMapping):
             'LeftShoulder': 1.0,
             'RightShoulder': 1.0,
             # Add more bone scale factors as needed
+        }
+
+    def get_capabilities(self):
+        return {
+            'face': False,
+            'hands': True,
         } 

@@ -190,4 +190,10 @@ class RigifyMapping(BaseRigMapping):
             'shoulder.L': 1.0,
             'shoulder.R': 1.0,
             # Add more bone scale factors as needed
+        }
+
+    def get_capabilities(self):
+        return {
+            'face': True,
+            'hands': True,
         } 
