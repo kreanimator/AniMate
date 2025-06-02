@@ -70,6 +70,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from bpy.app.handlers import persistent
+from mathutils import Vector, Matrix
 
 # Initialize MediaPipe solutions
 mp_pose = mp.solutions.pose
@@ -77,6 +78,8 @@ mp_face_mesh = mp.solutions.face_mesh
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
+
+ROT_YUP_TO_ZUP = Matrix.Rotation(-math.pi / 2, 4, 'X')
 
 def get_rig_types(self, context):
     return [
@@ -112,6 +115,11 @@ class AniMateProperties(PropertyGroup):
     show_camera_preview: BoolProperty(
         name="Show Camera Preview",
         description="Show the camera preview in the Image Editor",
+        default=True
+    )
+    camera_mirrored: BoolProperty(
+        name="Camera Mirrored",
+        description="Is the camera preview mirrored? (Flip X coordinates)",
         default=True
     )
     target_armature: PointerProperty(
@@ -184,6 +192,8 @@ class ANIMATE_PT_main_panel(Panel):
             row.prop(props, "enable_hands", text="Enable Hands")
         else:
             box.prop(props, "enable_hands")
+        # Camera mirroring toggle
+        box.prop(props, "camera_mirrored")
 
 class ANIMATE_PT_camera_preview(Panel):
     bl_label = "Camera Preview"
@@ -241,6 +251,28 @@ def split_and_set_image_editor(img_name):
                 space.image = bpy.data.images[img_name]
                 break
     return None  # Only run once
+
+def mediapipe_to_blender_coords(landmark, image_width, image_height, flip_x=True):
+    x = landmark.x
+    y = landmark.y
+    z = landmark.z
+    if flip_x:
+        x = 1.0 - x
+    x = (x - 0.5) * image_width
+    y = (y - 0.5) * image_height
+    return x, -z, y
+
+def mediapipe_to_blender_coords_pose(landmark, image_width, image_height, flip_x=True):
+    x = landmark.x
+    y = landmark.y
+    z = landmark.z
+    if flip_x:
+        x = 1.0 - x
+    x = (x - 0.5) * image_width
+    y = (y - 0.5) * image_height
+    vec = Vector((x, -z, y))
+    vec = ROT_YUP_TO_ZUP @ vec
+    return vec.x, vec.y, vec.z
 
 class ANIMATE_OT_start_capture(Operator):
     """Start motion capture."""
@@ -316,6 +348,22 @@ class ANIMATE_OT_start_capture(Operator):
 
             # Update the rig with the detected landmarks
             if self._mapper:
+                h, w, _ = frame.shape
+                flip_x = context.scene.animate_properties.camera_mirrored
+                # Convert pose landmarks with global rotation
+                if pose_landmarks:
+                    for lm in pose_landmarks.landmark:
+                        lm.x, lm.y, lm.z = mediapipe_to_blender_coords_pose(lm, w, h, flip_x=flip_x)
+                # Convert face and hand landmarks as before
+                if face_landmarks:
+                    for lm in face_landmarks.landmark:
+                        lm.x, lm.y, lm.z = mediapipe_to_blender_coords(lm, w, h, flip_x=flip_x)
+                if left_hand_landmarks:
+                    for lm in left_hand_landmarks.landmark:
+                        lm.x, lm.y, lm.z = mediapipe_to_blender_coords(lm, w, h, flip_x=flip_x)
+                if right_hand_landmarks:
+                    for lm in right_hand_landmarks.landmark:
+                        lm.x, lm.y, lm.z = mediapipe_to_blender_coords(lm, w, h, flip_x=flip_x)
                 self._mapper.update_rig(
                     pose_landmarks=pose_landmarks,
                     face_landmarks=face_landmarks,
@@ -391,6 +439,12 @@ class ANIMATE_OT_start_capture(Operator):
             # Initialize the rig mapper
             from rig.blender_mapper import BlenderRigMapper
             self._mapper = BlenderRigMapper(props.target_armature, rig_type=props.rig_type)
+
+            # --- AniMate: Rig scan, initialization, and pose store ---
+            self._mapper.scan_rig()
+            self._mapper.initialize_rig()
+            self._mapper.store_original_pose()
+            # --------------------------------------------------------
 
             # Split the view and set up the preview if enabled
             if props.show_camera_preview:

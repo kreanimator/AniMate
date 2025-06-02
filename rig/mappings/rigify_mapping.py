@@ -2,6 +2,8 @@
 Rigify rig mapping implementation.
 """
 from .base_mappings import BaseRigMapping
+from mathutils import Vector, Matrix, Euler
+
 
 class RigifyMapping(BaseRigMapping):
     """Mapping for Rigify rigs."""
