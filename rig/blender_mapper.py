@@ -119,6 +119,25 @@ class BlenderRigMapper:
 
         pose_mapping = self.mapping.get_pose_mapping()
 
+        # Expanded upper body and hand/finger bones
+        upper_body_bones = [
+            "Spine", "Spine1", "Spine2", "Neck", "Head", "HeadTop_End",
+            "RightShoulder", "RightArm", "RightForeArm", "RightHand",
+            "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
+            # Right hand fingers
+            "RightHandThumb1", "RightHandThumb2", "RightHandThumb3",
+            "RightHandIndex1", "RightHandIndex2", "RightHandIndex3",
+            "RightHandMiddle1", "RightHandMiddle2", "RightHandMiddle3",
+            "RightHandRing1", "RightHandRing2", "RightHandRing3",
+            "RightHandPinky1", "RightHandPinky2", "RightHandPinky3",
+            # Left hand fingers
+            "LeftHandThumb1", "LeftHandThumb2", "LeftHandThumb3",
+            "LeftHandIndex1", "LeftHandIndex2", "LeftHandIndex3",
+            "LeftHandMiddle1", "LeftHandMiddle2", "LeftHandMiddle3",
+            "LeftHandRing1", "LeftHandRing2", "LeftHandRing3",
+            "LeftHandPinky1", "LeftHandPinky2", "LeftHandPinky3"
+        ]
+
         for bone_name, landmark_indices in pose_mapping.items():
             full_bone_name = self.prefix + bone_name
             if full_bone_name not in self.pose_bones:
@@ -126,15 +145,14 @@ class BlenderRigMapper:
 
             # Only update if all required landmark indices are present
             if any(idx not in world_coords for idx in landmark_indices):
+                # Special handling for head/neck: keep last known good rotation
+                if bone_name in ["Head", "Neck"] and bone_name in self.previous_rotations:
+                    quat = self.previous_rotations[bone_name].to_quaternion()
+                    self.pose_bones[full_bone_name].rotation_quaternion = quat
                 continue
 
             # (Optional) Only update upper body bones if in upper_body_only mode
             if getattr(self, "upper_body_only", False):
-                upper_body_bones = [
-                    "Spine", "Spine1", "Spine2", "Neck", "Head", "HeadTop_End",
-                    "RightShoulder", "RightArm", "RightForeArm", "RightHand",
-                    "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand"
-                ]
                 if bone_name not in upper_body_bones:
                     continue
 
@@ -266,6 +284,7 @@ class BlenderRigMapper:
             self.process_pose_landmarks(pose_landmarks)
         if face_landmarks:
             self.process_face_landmarks(face_landmarks)
+        # Ensure hand landmarks are processed if available
         if left_hand_landmarks:
             self.process_hand_landmarks(left_hand_landmarks, is_right_hand=False)
         if right_hand_landmarks:
@@ -276,21 +295,13 @@ class BlenderRigMapper:
         
         # Update the pose using quaternions and insert keyframes
         for bone in pose.bones:
-            # Convert current rotation to quaternion
             quat = bone.rotation_quaternion
-            # Force update by setting the same quaternion
             bone.rotation_quaternion = quat
-            # Insert keyframe for rotation
             bone.keyframe_insert(data_path="rotation_quaternion", frame=current_frame)
-            
-        # Force viewport update
+        
         bpy.context.view_layer.update()
         bpy.context.scene.frame_set(current_frame)
-        
-        # Force GUI update
         bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
-        
-        # Redraw all 3D views
         for window in bpy.context.window_manager.windows:
             for area in window.screen.areas:
                 if area.type == 'VIEW_3D':
