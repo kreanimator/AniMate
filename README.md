@@ -6,9 +6,8 @@ A Blender plugin for animating humanoid rigs using motion capture data from Medi
 
 - Real-time motion capture using MediaPipe
 - Support for pose, face, and hand tracking
-- Configurable bone mappings
-- Test rigs for development and testing
-- Modular and extensible architecture
+- Modular, extensible architecture with clear separation of detection, mapping, rig, UI, and utility logic
+- Configurable bone mappings for Mixamo, Rigify, and Maya rigs
 
 ## Project Status
 
@@ -29,10 +28,11 @@ cd AniMate
 pip install -r requirements.txt
 ```
 
-3. Create a ZIP file for the Blender addon:
+3. Package the Blender addon:
 ```bash
-zip -r animate_addon.zip animate_addon
+bash package_addon.sh
 ```
+This will create `animate_addon.zip` in your project root.
 
 4. Install the Blender addon:
    - Open Blender
@@ -71,24 +71,43 @@ zip -r animate_addon.zip animate_addon
 
 ```
 AniMate/
-├── animate_addon/         # Blender addon files
-│   └── __init__.py       # Addon initialization and UI
-├── data/                  # Data and configuration files
-│   ├── bone_mappings.py   # MediaPipe to Blender bone mappings
-│   ├── landmark_structure.py # MediaPipe landmark definitions
-│   └── test_rigs.py       # Test rig configurations
-├── examples/              # Example scripts
-│   └── live_capture.py    # Live motion capture example
-├── rig/                   # Blender rig functionality
-│   ├── blender_mapper.py  # Blender-specific rig mapping
-│   └── retargeting.py     # Retargeting functionality
-├── tests/                 # Test scripts
-│   ├── test_detection.py  # MediaPipe detection tests
-│   └── test_rig.py        # Rig functionality tests
-├── utils/                 # Utility functions
-│   └── detection.py       # MediaPipe detection module
-└── README.md             # This file
+├── __init__.py            # Addon entry point and registration
+├── bpy_ui/                # Blender UI panels, operators, and properties
+│   ├── panels.py
+│   ├── operators.py
+│   ├── properties.py
+│   └── __init__.py
+├── detection/             # MediaPipe-based detection logic
+│   ├── mediapipe_detector.py
+│   ├── __init__.py
+│   └── README.md
+├── mapping/               # Rig mapping logic for different rig types
+│   ├── mixamo_mapping.py
+│   ├── rigify_mapping.py
+│   ├── maya_mapping.py
+│   ├── base_mappings.py
+│   ├── mapping_factory.py
+│   ├── __init__.py
+│   ├── README.md
+│   ├── README.txt
+│   └── README.rst
+├── rig/                   # Rig management, driver, and transfer logic
+│   ├── blender_mapper.py
+│   ├── drivers.py
+│   ├── transfer.py
+│   └── __init__.py
+├── utils/                 # Utility functions (math, coordinate transforms, etc)
+│   ├── math_utils.py
+│   └── __init__.py
 ```
+
+## Module Overview
+
+- **bpy_ui/**: All Blender UI logic (panels, operators, properties). Defines the AniMate panel, capture controls, and user settings.
+- **detection/**: MediaPipe-based detection logic for pose, hands, and face. Provides real-time landmark extraction.
+- **mapping/**: Rig mapping classes for Mixamo, Rigify, and Maya. Handles bone hierarchy, landmark-to-bone mapping, axis corrections, and rotation limits.
+- **rig/**: Core rig management, driver creation, and transfer logic. Handles driver empties, constraints, and applying landmark data to the rig.
+- **utils/**: Math and coordinate transformation utilities for converting MediaPipe data to Blender space.
 
 ## Usage
 
@@ -100,48 +119,15 @@ AniMate/
 4. Select your armature in the "Target Armature" field
 5. Configure detection settings (pose, face, hands)
 6. Click "Start Capture" to begin motion capture
+7. Landmarks will be drawn on the camera preview, and the rig will animate in real time if mapping is correct
 
-### Testing Detection
+## Modularity & Extensibility
 
-To test the MediaPipe detection functionality without Blender:
-
-```bash
-python tests/test_detection.py
-```
-
-Controls:
-- 'p' - Toggle pose detection
-- 'f' - Toggle face detection
-- 'h' - Toggle hand detection
-- 'ESC' - Exit
-
-## Development
-
-### Adding New Features
-
-1. Detection:
-   - Add new detection types in `utils/detection.py`
-   - Update bone mappings in `data/bone_mappings.py`
-
-2. Rig Support:
-   - Add new rig configurations in `data/test_rigs.py`
-   - Implement rig-specific mapping in `rig/blender_mapper.py`
-
-3. Addon UI:
-   - Modify `animate_addon/__init__.py` to add new UI elements
-   - Add new operators and properties as needed
-
-### Testing
-
-1. Run detection tests:
-```bash
-python tests/test_detection.py
-```
-
-2. Run rig tests:
-```bash
-python tests/test_rig.py
-```
+AniMate is designed for easy extension:
+- Add new rig types by creating a new mapping class in `mapping/` and registering it in `mapping_factory.py`.
+- Add new detection logic in `detection/`.
+- Extend the UI by adding new panels or operators in `bpy_ui/`.
+- Add math or coordinate utilities in `utils/`.
 
 ## Contributing
 
@@ -187,3 +173,18 @@ A sample Blender file is provided for development and testing:
 - **data/sample_scene_with_mixamo_rig.blend**
 
 This file contains a human mesh with a Mixamo rig and can be used as a test scene for AniMate development in Blender. Load this file to quickly test the addon with a compatible rig and mesh setup.
+
+## Planned Features & Future Releases
+
+AniMate is actively evolving! Planned features for future releases include:
+
+- **Motion capture from image/video files**: Animate rigs using prerecorded video or image sequences, not just live camera input.
+- **Multiple rig type support**: Seamless switching and mapping for Mixamo, Rigify, Maya, and custom rigs.
+- **Locked posing and region isolation**: Lock specific bones or regions (e.g., hands, feet, head) to prevent unwanted movement during capture.
+- **Improved UI/UX**: More intuitive controls, status indicators, and capture feedback.
+- **Advanced retargeting and smoothing**: Better motion smoothing, filtering, and retargeting options.
+- **Batch processing and automation**: Tools for automating capture and animation workflows.
+- **More extensibility hooks**: Easier ways for developers to add new rig types, mappings, or detection modes.
+
+If you have feature requests or want to contribute, please open an issue or pull request!
+

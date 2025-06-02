@@ -4,27 +4,21 @@ set -e
 # Clean up any previous build
 rm -rf animate_addon_dist animate_addon.zip
 
-# Create a new dist directory
+# Create the dist directory
 mkdir animate_addon_dist
 
-# Copy the main addon and dependencies
-cp -r animate_addon animate_addon_dist/
-cp -r rig animate_addon_dist/
-cp -r data animate_addon_dist/
-# Add any other folders you need, e.g.:
-# cp -r utils animate_addon_dist/
-# cp -r examples animate_addon_dist/
+# Copy the new_structure as a subdirectory
+cp -r AniMate animate_addon_dist/
 
-# (Optional) Copy README, license, etc.
-# cp README.md animate_addon_dist/
-# cp LICENSE animate_addon_dist/
+# Rename the folder inside the zip to animate_addon
+mv animate_addon_dist/AniMate animate_addon_dist/animate_addon
 
 # Zip it up
 cd animate_addon_dist
-zip -r ../animate_addon.zip .
+zip -r ../animate_addon.zip animate_addon
 cd ..
 
 # Clean up dist directory
 rm -rf animate_addon_dist
 
-echo "Created animate_addon.zip. Install this in Blender via Edit > Preferences > Add-ons > Install." 
+echo "Created animate_addon.zip. Install this in Blender via Edit > Preferences > Add-ons > Install."
