@@ -179,3 +179,11 @@ To install this addon in Blender, you need to package all required folders into 
 - `data/` (any data files needed)
 
 If you add more dependencies (like `utils/` or `examples/`), uncomment the relevant lines in `package_addon.sh`.
+
+## Test Scene for Blender Development
+
+A sample Blender file is provided for development and testing:
+
+- **data/sample_scene_with_mixamo_rig.blend**
+
+This file contains a human mesh with a Mixamo rig and can be used as a test scene for AniMate development in Blender. Load this file to quickly test the addon with a compatible rig and mesh setup.
