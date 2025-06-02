@@ -160,7 +160,7 @@ class BlenderRigMapper:
             if bone_name == "Hips":
                 if not (23 in world_coords and 24 in world_coords):
                     continue
-
+            
             # Calculate bone orientation from landmarks
             if len(landmark_indices) == 2:
                 start_point = world_coords[landmark_indices[0]]
