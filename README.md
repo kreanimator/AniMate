@@ -274,3 +274,18 @@ AniMate is actively evolving! Planned features for future releases include:
 
 If you have feature requests or want to contribute, please open an issue or pull request!
 
+## Build Version Display
+
+AniMate displays the exact build version in its UI panel for easy debugging and version tracking. Every time you package the addon, a unique build string is generated and shown in Blender:
+
+![AniMate Build Version](docs/images/animate_build_version.png)
+
+**Example:**
+```
+AniMate Version: 0.1.0 (dev: build-2025-06-03_22-09-00-git-76cb7d3)
+```
+- `build-2025-06-03_22-09-00` is the build timestamp (YYYY-MM-DD_HH-MM-SS)
+- `git-76cb7d3` is the short git commit hash
+
+This ensures you always know which build is installed, helping to avoid confusion when testing or debugging new features.
+

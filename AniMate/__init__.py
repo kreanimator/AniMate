@@ -1,8 +1,8 @@
+from .__dev_build__ import __dev_build__
 bl_info = {
     "name": "AniMate",
     "author": "Valentin Bakin",
     "version": (0, 1, 0),
-    "dev_build_version": (0, 1, 0),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > AniMate",
     "description": "Motion capture and animation using MediaPipe",
@@ -10,6 +10,8 @@ bl_info = {
     "doc_url": "",
     "category": "Animation",
 }
+bl_info["description"] += f" (Build: {__dev_build__}) | GitHub: https://github.com/kreanimator/AniMate | Docs: https://docs.sosw.app/contribution/index.html"
+
 
 import bpy
 from .bpy_ui.panels import AniMateMainPanel
