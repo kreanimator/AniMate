@@ -2,6 +2,7 @@ bl_info = {
     "name": "AniMate",
     "author": "Valentin Bakin",
     "version": (0, 1, 0),
+    "dev_build_version": (0, 1, 0),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > AniMate",
     "description": "Motion capture and animation using MediaPipe",
