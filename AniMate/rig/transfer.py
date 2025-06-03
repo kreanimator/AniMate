@@ -77,6 +77,11 @@ class TransferManager:
         print(f"[AniMate] apply_hand_landmarks mapping keys: {list(hand_mapping.keys())}")
         remap_tables = self.mapping.get_hand_remap_table()
         for finger_name, joint_indices in hand_mapping.items():
+            # Only update the correct hand
+            if is_right_hand and not finger_name.startswith("RightHand"):
+                continue
+            if not is_right_hand and not finger_name.startswith("LeftHand"):
+                continue
             print(f"[AniMate] Checking {finger_name} with indices {joint_indices}")
             full_bone_name = self.driver_manager.prefix + finger_name
             if full_bone_name not in self.driver_manager.driver_objects:
@@ -86,24 +91,41 @@ class TransferManager:
                 print(f"[AniMate] SKIP: Not all indices present for bone {full_bone_name}")
                 continue
             print(f"[AniMate] UPDATING: {full_bone_name} with indices {joint_indices}")
-            if len(joint_indices) == 2:
+            # Angle-based calculation for finger curl (if 3 indices)
+            if len(joint_indices) == 3:
+                a = world_coords[joint_indices[0]]
+                b = world_coords[joint_indices[1]]
+                c = world_coords[joint_indices[2]]
+                v1 = a - b
+                v2 = c - b
+                v1.normalize()
+                v2.normalize()
+                import math
+                dot = max(-1.0, min(1.0, v1.dot(v2)))
+                raw_angle = math.acos(dot)
+                print(f"[AniMate][DEBUG] {finger_name} raw_angle (angle): {raw_angle}")
+            elif len(joint_indices) == 2:
                 start_point = world_coords[joint_indices[0]]
                 end_point = world_coords[joint_indices[1]]
                 raw_angle = (end_point - start_point).length
-                if finger_name in remap_tables:
-                    in_rng, out_rng = remap_tables[finger_name]
-                    remapped_angle = remap(raw_angle, *in_rng, *out_rng)
-                else:
-                    remapped_angle = raw_angle  # fallback if not found
-                rotation = Euler((remapped_angle, 0, 0))
-                rotation = self.apply_rotation_limits(full_bone_name, rotation)
-                scale_factor = self.mapping.get_bone_scale_factors().get(finger_name, 1.0)
-                rotation = Euler((rotation.x * scale_factor, rotation.y * scale_factor, rotation.z * scale_factor))
-                axis_correction_fn = axis_corrections.get(full_bone_name, lambda e: e)
-                corrected_rot = axis_correction_fn(rotation)
-                rest_rot = rest_pose_rotations.get(full_bone_name, Euler((0, 0, 0)))
-                final_driver_rot = (rest_rot.to_matrix().inverted() @ corrected_rot.to_matrix()).to_euler()
-                self.driver_manager.update_driver(full_bone_name, final_driver_rot)
+                print(f"[AniMate][DEBUG] {finger_name} raw_angle (distance): {raw_angle}")
+            else:
+                continue
+            if finger_name in remap_tables:
+                in_rng, out_rng = remap_tables[finger_name]
+                remapped_angle = remap(raw_angle, *in_rng, *out_rng)
+            else:
+                remapped_angle = raw_angle  # fallback if not found
+            print(f"[AniMate][DEBUG] {finger_name} remapped_angle: {remapped_angle}")
+            rotation = Euler((remapped_angle, 0, 0))
+            rotation = self.apply_rotation_limits(full_bone_name, rotation)
+            scale_factor = self.mapping.get_bone_scale_factors().get(finger_name, 1.0)
+            rotation = Euler((rotation.x * scale_factor, rotation.y * scale_factor, rotation.z * scale_factor))
+            axis_correction_fn = axis_corrections.get(full_bone_name, lambda e: e)
+            corrected_rot = axis_correction_fn(rotation)
+            rest_rot = rest_pose_rotations.get(full_bone_name, Euler((0, 0, 0)))
+            final_driver_rot = (rest_rot.to_matrix().inverted() @ corrected_rot.to_matrix()).to_euler()
+            self.driver_manager.update_driver(full_bone_name, final_driver_rot)
 
     def apply_face_landmarks(self, world_coords: Dict[int, Vector], face_mapping: Dict[str, Any], rest_pose_rotations: Dict[str, Euler]) -> None:
         """
