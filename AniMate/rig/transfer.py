@@ -70,29 +70,32 @@ class TransferManager:
 
     def apply_hand_landmarks(self, world_coords: Dict[int, Vector], hand_mapping: Dict[str, Any], axis_corrections: Dict[str, Callable], rest_pose_rotations: Dict[str, Euler], is_right_hand: bool = True) -> None:
         """
-        Apply hand landmarks to the rig drivers.
+        Apply hands landmarks to the rig drivers.
         """
+        print(f"[AniMate] apply_hand_landmarks called for hand, is_right_hand={is_right_hand}")
+        print(f"[AniMate] apply_hand_landmarks mapping keys: {list(hand_mapping.keys())}")
         for finger_name, joint_indices in hand_mapping.items():
-            if is_right_hand and not finger_name.endswith('.R'):
-                continue
-            if not is_right_hand and not finger_name.endswith('.L'):
-                continue
-            if finger_name not in self.driver_manager.driver_objects:
+            print(f"[AniMate] Checking {finger_name} with indices {joint_indices}")
+            full_bone_name = self.driver_manager.prefix + finger_name
+            if full_bone_name not in self.driver_manager.driver_objects:
+                print(f"[AniMate] SKIP: Bone {full_bone_name} not in driver objects")
                 continue
             if any(idx not in world_coords for idx in joint_indices):
+                print(f"[AniMate] SKIP: Not all indices present for bone {full_bone_name}")
                 continue
+            print(f"[AniMate] UPDATING: {full_bone_name} with indices {joint_indices}")
             if len(joint_indices) == 2:
                 start_point = world_coords[joint_indices[0]]
                 end_point = world_coords[joint_indices[1]]
                 rotation = self.calculate_bone_rotation(start_point, end_point)
-                rotation = self.apply_rotation_limits(finger_name, rotation)
+                rotation = self.apply_rotation_limits(full_bone_name, rotation)
                 scale_factor = self.mapping.get_bone_scale_factors().get(finger_name, 1.0)
                 rotation = Euler((rotation.x * scale_factor, rotation.y * scale_factor, rotation.z * scale_factor))
-                axis_correction_fn = axis_corrections.get(finger_name, lambda e: e)
+                axis_correction_fn = axis_corrections.get(full_bone_name, lambda e: e)
                 corrected_rot = axis_correction_fn(rotation)
-                rest_rot = rest_pose_rotations.get(finger_name, Euler((0, 0, 0)))
+                rest_rot = rest_pose_rotations.get(full_bone_name, Euler((0, 0, 0)))
                 final_driver_rot = (rest_rot.to_matrix().inverted() @ corrected_rot.to_matrix()).to_euler()
-                self.driver_manager.update_driver(finger_name, final_driver_rot)
+                self.driver_manager.update_driver(full_bone_name, final_driver_rot)
 
     def apply_face_landmarks(self, world_coords: Dict[int, Vector], face_mapping: Dict[str, Any], rest_pose_rotations: Dict[str, Euler]) -> None:
         """
@@ -113,3 +116,4 @@ class TransferManager:
                 rest_rot = rest_pose_rotations.get(bone_name, Euler((0, 0, 0)))
                 final_driver_rot = (rest_rot.to_matrix().inverted() @ rotation.to_matrix()).to_euler()
                 self.driver_manager.update_driver(bone_name, final_driver_rot) 
+                
