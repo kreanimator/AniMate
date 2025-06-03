@@ -21,4 +21,9 @@ def mediapipe_to_blender_coords_pose(landmark, image_width, image_height, flip_x
         x = image_width - x
     vec = Vector((x, y, z))
     vec = ROT_YUP_TO_ZUP @ vec
-    return vec 
+    return vec
+
+def remap(val, in_min, in_max, out_min, out_max):
+    val = max(min(val, in_max), in_min)
+    return out_min + (float(val - in_min) / float(in_max - in_min)) * (out_max - out_min) 
+    

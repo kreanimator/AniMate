@@ -3,6 +3,7 @@ Transfer logic for AniMate Blender addon.
 """
 from mathutils import Euler, Vector, Matrix
 from typing import Any, Dict, Callable
+from ..utils.math_utils import remap
 
 class TransferManager:
     """Handles transfer of landmark data to Blender rig drivers."""
@@ -74,6 +75,7 @@ class TransferManager:
         """
         print(f"[AniMate] apply_hand_landmarks called for hand, is_right_hand={is_right_hand}")
         print(f"[AniMate] apply_hand_landmarks mapping keys: {list(hand_mapping.keys())}")
+        remap_tables = self.mapping.get_hand_remap_table()
         for finger_name, joint_indices in hand_mapping.items():
             print(f"[AniMate] Checking {finger_name} with indices {joint_indices}")
             full_bone_name = self.driver_manager.prefix + finger_name
@@ -87,7 +89,13 @@ class TransferManager:
             if len(joint_indices) == 2:
                 start_point = world_coords[joint_indices[0]]
                 end_point = world_coords[joint_indices[1]]
-                rotation = self.calculate_bone_rotation(start_point, end_point)
+                raw_angle = (end_point - start_point).length
+                if finger_name in remap_tables:
+                    in_rng, out_rng = remap_tables[finger_name]
+                    remapped_angle = remap(raw_angle, *in_rng, *out_rng)
+                else:
+                    remapped_angle = raw_angle  # fallback if not found
+                rotation = Euler((remapped_angle, 0, 0))
                 rotation = self.apply_rotation_limits(full_bone_name, rotation)
                 scale_factor = self.mapping.get_bone_scale_factors().get(finger_name, 1.0)
                 rotation = Euler((rotation.x * scale_factor, rotation.y * scale_factor, rotation.z * scale_factor))

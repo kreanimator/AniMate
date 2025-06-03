@@ -117,17 +117,15 @@ class ANIMATE_OT_start_capture(Operator):
             if props.enable_hands:
                 results_hands = self.mp_hands.process(frame)
                 print(f"[AniMate] Hand landmarks: {getattr(results_hands, 'multi_hand_landmarks', None)}")
-                if results_hands.multi_hand_landmarks:
-                    # Swap hands if needed (MediaPipe may swap left/right)
-                    left_hand_landmarks = None
-                    right_hand_landmarks = None
-                    if len(results_hands.multi_hand_landmarks) == 1:
-                        # If only one hand detected, assign to left by default
-                        left_hand_landmarks = results_hands.multi_hand_landmarks[0]
-                    elif len(results_hands.multi_hand_landmarks) > 1:
-                        # If two hands detected, swap them
-                        left_hand_landmarks = results_hands.multi_hand_landmarks[1]
-                        right_hand_landmarks = results_hands.multi_hand_landmarks[0]
+                left_hand_landmarks = None
+                right_hand_landmarks = None
+                if results_hands.multi_hand_landmarks and results_hands.multi_handedness:
+                    for idx, hand_landmarks in enumerate(results_hands.multi_hand_landmarks):
+                        handedness = results_hands.multi_handedness[idx].classification[0].label
+                        if handedness == 'Left':
+                            left_hand_landmarks = hand_landmarks
+                        elif handedness == 'Right':
+                            right_hand_landmarks = hand_landmarks
             # Draw landmarks on the preview frame
             if pose_landmarks:
                 mp_drawing.draw_landmarks(
