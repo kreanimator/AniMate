@@ -111,39 +111,35 @@ class MixamoMapping(BaseRigMapping):
         }
 
     def get_hand_mapping(self):
+        # MediaPipe hand indices: https://google.github.io/mediapipe/solutions/hands.html#hand-landmark-model
+        # Thumb: CMC(1), MCP(2), IP(3), TIP(4)
+        # Index: MCP(5), PIP(6), DIP(7), TIP(8)
+        # Middle: MCP(9), PIP(10), DIP(11), TIP(12)
+        # Ring: MCP(13), PIP(14), DIP(15), TIP(16)
+        # Pinky: MCP(17), PIP(18), DIP(19), TIP(20)
         return {
-            # Right hand fingers only
-            "RightHandThumb1": [0, 1],
-            "RightHandThumb2": [1, 2],
-            "RightHandThumb3": [2, 3],
-            "RightHandIndex1": [0, 5],
-            "RightHandIndex2": [5, 6],
-            "RightHandIndex3": [6, 7],
-            "RightHandMiddle1": [0, 9],
-            "RightHandMiddle2": [9, 10],
-            "RightHandMiddle3": [10, 11],
-            "RightHandRing1": [0, 13],
-            "RightHandRing2": [13, 14],
-            "RightHandRing3": [14, 15],
-            "RightHandPinky1": [0, 17],
-            "RightHandPinky2": [17, 18],
-            "RightHandPinky3": [18, 19],
-            # Left hand fingers only
-            "LeftHandThumb1": [0, 1],
-            "LeftHandThumb2": [1, 2],
-            "LeftHandThumb3": [2, 3],
-            "LeftHandIndex1": [0, 5],
-            "LeftHandIndex2": [5, 6],
-            "LeftHandIndex3": [6, 7],
-            "LeftHandMiddle1": [0, 9],
-            "LeftHandMiddle2": [9, 10],
-            "LeftHandMiddle3": [10, 11],
-            "LeftHandRing1": [0, 13],
-            "LeftHandRing2": [13, 14],
-            "LeftHandRing3": [14, 15],
-            "LeftHandPinky1": [0, 17],
-            "LeftHandPinky2": [17, 18],
-            "LeftHandPinky3": [18, 19],
+            # Right hand fingers (use 3 indices for angle: base, mid, tip)
+            "RightHandThumb1": [1, 2, 3],
+            "RightHandThumb2": [2, 3, 4],
+            "RightHandIndex1": [5, 6, 7],
+            "RightHandIndex2": [6, 7, 8],
+            "RightHandMiddle1": [9, 10, 11],
+            "RightHandMiddle2": [10, 11, 12],
+            "RightHandRing1": [13, 14, 15],
+            "RightHandRing2": [14, 15, 16],
+            "RightHandPinky1": [17, 18, 19],
+            "RightHandPinky2": [18, 19, 20],
+            # Left hand fingers (same indices, MediaPipe always gives 21 landmarks per hand)
+            "LeftHandThumb1": [1, 2, 3],
+            "LeftHandThumb2": [2, 3, 4],
+            "LeftHandIndex1": [5, 6, 7],
+            "LeftHandIndex2": [6, 7, 8],
+            "LeftHandMiddle1": [9, 10, 11],
+            "LeftHandMiddle2": [10, 11, 12],
+            "LeftHandRing1": [13, 14, 15],
+            "LeftHandRing2": [14, 15, 16],
+            "LeftHandPinky1": [17, 18, 19],
+            "LeftHandPinky2": [18, 19, 20],
         }
 
     def get_bone_rotation_limits(self):
@@ -204,38 +200,40 @@ class MixamoMapping(BaseRigMapping):
         Returns remap tables for all hand joints (both hands).
         Each entry is a tuple: (input_range, output_range)
         """
+        wide_in = (0, 100)
+        out = (0, 1.0)
         return {
             # Right hand
-            "RightHandThumb1":  ((0.011, 0.630), (-.60, 0.63)),
-            "RightHandThumb2":  ((0.010, 0.536), (-.30, 0.54)),
-            "RightHandThumb3":  ((0.008, 1.035), (-.15, 1.03)),
-            "RightHandIndex1":  ((0.105, 1.331), (-.50, 1.33)),
-            "RightHandIndex2":  ((0.014, 1.858), (-.20, 1.86)),
-            "RightHandIndex3":  ((0.340, 1.523), (-.55, 1.52)),
-            "RightHandMiddle1": ((0.046, 1.326), (-.50, 1.33)),
-            "RightHandMiddle2": ((0.330, 1.803), (-.30, 1.80)),
-            "RightHandMiddle3": ((0.007, 1.911), (-.15, 1.91)),
-            "RightHandRing1":   ((0.012, 1.477), (-.60, 1.48)),
-            "RightHandRing2":   ((0.244, 1.674), (-.30, 1.67)),
-            "RightHandRing3":   ((0.021, 1.614), (-.30, 1.61)),
-            "RightHandPinky1":  ((0.120, 1.322), (-.80, 1.32)),
-            "RightHandPinky2":  ((0.213, 1.584), (-.50, 1.58)),
-            "RightHandPinky3":  ((0.018, 1.937), (-.30, 1.94)),
+            "RightHandThumb1":  (wide_in, out),
+            "RightHandThumb2":  (wide_in, out),
+            "RightHandThumb3":  (wide_in, out),
+            "RightHandIndex1":  (wide_in, out),
+            "RightHandIndex2":  (wide_in, out),
+            "RightHandIndex3":  (wide_in, out),
+            "RightHandMiddle1": (wide_in, out),
+            "RightHandMiddle2": (wide_in, out),
+            "RightHandMiddle3": (wide_in, out),
+            "RightHandRing1":   (wide_in, out),
+            "RightHandRing2":   (wide_in, out),
+            "RightHandRing3":   (wide_in, out),
+            "RightHandPinky1":  (wide_in, out),
+            "RightHandPinky2":  (wide_in, out),
+            "RightHandPinky3":  (wide_in, out),
             # Left hand
-            "LeftHandThumb1":  ((0.011, 0.630), (-.60, 0.63)),
-            "LeftHandThumb2":  ((0.010, 0.536), (-.30, 0.54)),
-            "LeftHandThumb3":  ((0.008, 1.035), (-.15, 1.03)),
-            "LeftHandIndex1":  ((0.105, 1.331), (-.50, 1.33)),
-            "LeftHandIndex2":  ((0.014, 1.858), (-.20, 1.86)),
-            "LeftHandIndex3":  ((0.340, 1.523), (-.55, 1.52)),
-            "LeftHandMiddle1": ((0.046, 1.326), (-.50, 1.33)),
-            "LeftHandMiddle2": ((0.330, 1.803), (-.30, 1.80)),
-            "LeftHandMiddle3": ((0.007, 1.911), (-.15, 1.91)),
-            "LeftHandRing1":   ((0.012, 1.477), (-.60, 1.48)),
-            "LeftHandRing2":   ((0.244, 1.674), (-.30, 1.67)),
-            "LeftHandRing3":   ((0.021, 1.614), (-.30, 1.61)),
-            "LeftHandPinky1":  ((0.120, 1.322), (-.80, 1.32)),
-            "LeftHandPinky2":  ((0.213, 1.584), (-.50, 1.58)),
-            "LeftHandPinky3":  ((0.018, 1.937), (-.30, 1.94)),
+            "LeftHandThumb1":  (wide_in, out),
+            "LeftHandThumb2":  (wide_in, out),
+            "LeftHandThumb3":  (wide_in, out),
+            "LeftHandIndex1":  (wide_in, out),
+            "LeftHandIndex2":  (wide_in, out),
+            "LeftHandIndex3":  (wide_in, out),
+            "LeftHandMiddle1": (wide_in, out),
+            "LeftHandMiddle2": (wide_in, out),
+            "LeftHandMiddle3": (wide_in, out),
+            "LeftHandRing1":   (wide_in, out),
+            "LeftHandRing2":   (wide_in, out),
+            "LeftHandRing3":   (wide_in, out),
+            "LeftHandPinky1":  (wide_in, out),
+            "LeftHandPinky2":  (wide_in, out),
+            "LeftHandPinky3":  (wide_in, out),
         } 
         
