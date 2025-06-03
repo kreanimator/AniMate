@@ -118,10 +118,16 @@ class ANIMATE_OT_start_capture(Operator):
                 results_hands = self.mp_hands.process(frame)
                 print(f"[AniMate] Hand landmarks: {getattr(results_hands, 'multi_hand_landmarks', None)}")
                 if results_hands.multi_hand_landmarks:
-                    if len(results_hands.multi_hand_landmarks) > 0:
+                    # Swap hands if needed (MediaPipe may swap left/right)
+                    left_hand_landmarks = None
+                    right_hand_landmarks = None
+                    if len(results_hands.multi_hand_landmarks) == 1:
+                        # If only one hand detected, assign to left by default
                         left_hand_landmarks = results_hands.multi_hand_landmarks[0]
-                    if len(results_hands.multi_hand_landmarks) > 1:
-                        right_hand_landmarks = results_hands.multi_hand_landmarks[1]
+                    elif len(results_hands.multi_hand_landmarks) > 1:
+                        # If two hands detected, swap them
+                        left_hand_landmarks = results_hands.multi_hand_landmarks[1]
+                        right_hand_landmarks = results_hands.multi_hand_landmarks[0]
             # Draw landmarks on the preview frame
             if pose_landmarks:
                 mp_drawing.draw_landmarks(
@@ -221,3 +227,4 @@ class ANIMATE_OT_stop_capture(Operator):
         self.report({'INFO'}, "Capture stopped")
         print("[AniMate] animate_running set to False by stop operator.")
         return {'FINISHED'} 
+        

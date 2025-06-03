@@ -226,3 +226,4 @@ class MixamoMapping(BaseRigMapping):
             'mixamorig:LeftToeBase': lambda e: Euler((e.x, -e.y, e.z)),
             'mixamorig:LeftToe_End': lambda e: Euler((e.x, -e.y, e.z)),
         } 
+        

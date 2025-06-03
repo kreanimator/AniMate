@@ -6,7 +6,7 @@ class AniMateProperties(PropertyGroup):
     enable_pose: BoolProperty(
         name="Enable Pose",
         description="Enable pose detection",
-        default=True
+        default=False
     )
     enable_face: BoolProperty(
         name="Enable Face",
@@ -16,7 +16,7 @@ class AniMateProperties(PropertyGroup):
     enable_hands: BoolProperty(
         name="Enable Hands",
         description="Enable hand detection",
-        default=False
+        default=True
     )
     show_camera_preview: BoolProperty(
         name="Show Camera Preview",
