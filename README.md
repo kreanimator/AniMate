@@ -131,11 +131,97 @@ AniMate is designed for easy extension:
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+### Initialization
+
+1. Fork the repository: https://github.com/kreanimator/AniMate
+2. Clone your fork:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/AniMate.git
+   cd AniMate
+   ```
+3. Set up your development environment:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### Development Workflow
+
+1. Keep your fork up to date:
+   ```bash
+   # Add upstream remote
+   git remote add upstream https://github.com/kreanimator/AniMate.git
+   
+   # Fetch upstream changes
+   git fetch upstream
+   
+   # Update your main branch
+   git checkout main
+   git merge upstream/main
+   ```
+
+2. Create a feature branch:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+3. Make your changes and commit:
+   ```bash
+   git add .
+   git commit -m "Add: your feature description"
+   ```
+
+4. Push to your fork:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+### Pull Request Process
+
+1. Ensure your code follows our standards:
+   - Follow PEP 8 guidelines
+   - Add docstrings for new functions/classes
+   - Write tests for new features
+   - Update documentation if needed
+
+2. Create a Pull Request:
+   - Go to your fork on GitHub
+   - Click "New Pull Request"
+   - Select your feature branch
+   - Fill in the PR template
+   - Submit the PR
+
+3. Keep your PR up to date:
+   ```bash
+   git fetch upstream
+   git checkout feature/your-feature-name
+   git merge upstream/main
+   git push origin feature/your-feature-name
+   ```
+
+### Code Standards
+
+1. **Python Code Style**
+   - Follow PEP 8 guidelines
+   - Use meaningful variable and function names
+   - Add docstrings for all public functions and classes
+   - Keep functions focused and small
+   - Use type hints where appropriate
+
+2. **Commit Messages**
+   - Use clear and descriptive messages
+   - Start with a verb in present tense (e.g., "Add", "Fix", "Update")
+   - Reference issue numbers when applicable
+   - Keep messages concise but informative
+
+3. **Testing**
+   - Write tests for new features
+   - Ensure all tests pass before submitting PR
+   - Update tests when modifying existing features
+
+4. **Documentation**
+   - Update README.md for significant changes
+   - Add docstrings for new functions/classes
+   - Update inline comments when modifying complex logic
 
 ## License
 
