@@ -112,6 +112,7 @@ class MixamoMapping(BaseRigMapping):
 
     def get_hand_mapping(self):
         return {
+            # Right hand fingers only
             "RightHandThumb1": [0, 1],
             "RightHandThumb2": [1, 2],
             "RightHandThumb3": [2, 3],
@@ -127,6 +128,7 @@ class MixamoMapping(BaseRigMapping):
             "RightHandPinky1": [0, 17],
             "RightHandPinky2": [17, 18],
             "RightHandPinky3": [18, 19],
+            # Left hand fingers only
             "LeftHandThumb1": [0, 1],
             "LeftHandThumb2": [1, 2],
             "LeftHandThumb3": [2, 3],
@@ -185,45 +187,55 @@ class MixamoMapping(BaseRigMapping):
     def get_axis_corrections(self):
         from mathutils import Euler
         return {
-            # Torso
-            'mixamorig:Hips': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:Spine': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:Spine1': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:Spine2': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:Neck': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:Head': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:HeadTop_End': lambda e: Euler((e.x, e.y, e.z)),
-            # Shoulders
-            'mixamorig:RightShoulder': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:LeftShoulder': lambda e: Euler((e.x, e.y, e.z)),
-            # Arms (swap/invert Y as a starting point)
-            'mixamorig:RightArm': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:RightForeArm': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:RightHand': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftArm': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftForeArm': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftHand': lambda e: Euler((e.x, -e.y, e.z)),
-            # Fingers (identity, tune as needed)
-            **{f'mixamorig:RightHandThumb{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:RightHandIndex{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:RightHandMiddle{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:RightHandRing{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:RightHandPinky{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:LeftHandThumb{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:LeftHandIndex{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:LeftHandMiddle{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:LeftHandRing{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:LeftHandPinky{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            # Legs (swap/invert Y as a starting point)
-            'mixamorig:RightUpLeg': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:RightLeg': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:RightFoot': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:RightToeBase': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:RightToe_End': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftUpLeg': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftLeg': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftFoot': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftToeBase': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftToe_End': lambda e: Euler((e.x, -e.y, e.z)),
+            **{f'mixamorig:RightHandThumb{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:RightHandIndex{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:RightHandMiddle{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:RightHandRing{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:RightHandPinky{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:LeftHandThumb{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:LeftHandIndex{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:LeftHandMiddle{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:LeftHandRing{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:LeftHandPinky{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 4)},
+        }
+
+    def get_hand_remap_table(self):
+        """
+        Returns remap tables for all hand joints (both hands).
+        Each entry is a tuple: (input_range, output_range)
+        """
+        return {
+            # Right hand
+            "RightHandThumb1":  ((0.011, 0.630), (-.60, 0.63)),
+            "RightHandThumb2":  ((0.010, 0.536), (-.30, 0.54)),
+            "RightHandThumb3":  ((0.008, 1.035), (-.15, 1.03)),
+            "RightHandIndex1":  ((0.105, 1.331), (-.50, 1.33)),
+            "RightHandIndex2":  ((0.014, 1.858), (-.20, 1.86)),
+            "RightHandIndex3":  ((0.340, 1.523), (-.55, 1.52)),
+            "RightHandMiddle1": ((0.046, 1.326), (-.50, 1.33)),
+            "RightHandMiddle2": ((0.330, 1.803), (-.30, 1.80)),
+            "RightHandMiddle3": ((0.007, 1.911), (-.15, 1.91)),
+            "RightHandRing1":   ((0.012, 1.477), (-.60, 1.48)),
+            "RightHandRing2":   ((0.244, 1.674), (-.30, 1.67)),
+            "RightHandRing3":   ((0.021, 1.614), (-.30, 1.61)),
+            "RightHandPinky1":  ((0.120, 1.322), (-.80, 1.32)),
+            "RightHandPinky2":  ((0.213, 1.584), (-.50, 1.58)),
+            "RightHandPinky3":  ((0.018, 1.937), (-.30, 1.94)),
+            # Left hand
+            "LeftHandThumb1":  ((0.011, 0.630), (-.60, 0.63)),
+            "LeftHandThumb2":  ((0.010, 0.536), (-.30, 0.54)),
+            "LeftHandThumb3":  ((0.008, 1.035), (-.15, 1.03)),
+            "LeftHandIndex1":  ((0.105, 1.331), (-.50, 1.33)),
+            "LeftHandIndex2":  ((0.014, 1.858), (-.20, 1.86)),
+            "LeftHandIndex3":  ((0.340, 1.523), (-.55, 1.52)),
+            "LeftHandMiddle1": ((0.046, 1.326), (-.50, 1.33)),
+            "LeftHandMiddle2": ((0.330, 1.803), (-.30, 1.80)),
+            "LeftHandMiddle3": ((0.007, 1.911), (-.15, 1.91)),
+            "LeftHandRing1":   ((0.012, 1.477), (-.60, 1.48)),
+            "LeftHandRing2":   ((0.244, 1.674), (-.30, 1.67)),
+            "LeftHandRing3":   ((0.021, 1.614), (-.30, 1.61)),
+            "LeftHandPinky1":  ((0.120, 1.322), (-.80, 1.32)),
+            "LeftHandPinky2":  ((0.213, 1.584), (-.50, 1.58)),
+            "LeftHandPinky3":  ((0.018, 1.937), (-.30, 1.94)),
         } 
         

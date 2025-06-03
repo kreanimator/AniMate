@@ -158,12 +158,10 @@ class BlenderRigMapper:
         if not self.armature or not landmarks:
             logger.warning("No armature or landmarks for hand processing")
             return
-            
         world_coords = {}
         for i, landmark in enumerate(landmarks.landmark):
-            if hasattr(landmark, 'visibility') and landmark.visibility > 0.5:
-                world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
-                
+            # For hands, do NOT check visibility (always 21 landmarks)
+            world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
         hand_mapping = self.mapping.get_hand_mapping()
         print(f"[AniMate] hand_mapping keys: {list(hand_mapping.keys())}")
         self.transfer_manager.apply_hand_landmarks(
