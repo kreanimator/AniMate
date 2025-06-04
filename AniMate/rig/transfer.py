@@ -103,11 +103,22 @@ class TransferManager:
                 import math
                 dot = max(-1.0, min(1.0, v1.dot(v2)))
                 raw_angle = math.acos(dot)
+
+                # # Additional check to prevent extreme movements
+                # # This helps prevent fingers from going through the palm
+                # max_angle = math.pi * 0.8  # Limit to 80% of 180 degrees
+                # raw_angle = min(raw_angle, max_angle)
+
                 print(f"[AniMate][DEBUG] {finger_name} raw_angle (angle): {raw_angle}")
             elif len(joint_indices) == 2:
                 start_point = world_coords[joint_indices[0]]
                 end_point = world_coords[joint_indices[1]]
                 raw_angle = (end_point - start_point).length
+
+                # Additional check to prevent extreme movements
+                max_distance = 5.0  # Reasonable maximum distance
+                raw_angle = min(raw_angle, max_distance)
+
                 print(f"[AniMate][DEBUG] {finger_name} raw_angle (distance): {raw_angle}")
             else:
                 continue
@@ -117,6 +128,9 @@ class TransferManager:
             else:
                 remapped_angle = raw_angle  # fallback if not found
             print(f"[AniMate][DEBUG] {finger_name} remapped_angle: {remapped_angle}")
+            # Use the remapped angle directly without additional offset
+            # This prevents fingers from being forced into a closed position
+            import math
             rotation = Euler((remapped_angle, 0, 0))
             rotation = self.apply_rotation_limits(full_bone_name, rotation)
             scale_factor = self.mapping.get_bone_scale_factors().get(finger_name, 1.0)
@@ -146,4 +160,3 @@ class TransferManager:
                 rest_rot = rest_pose_rotations.get(bone_name, Euler((0, 0, 0)))
                 final_driver_rot = (rest_rot.to_matrix().inverted() @ rotation.to_matrix()).to_euler()
                 self.driver_manager.update_driver(bone_name, final_driver_rot) 
-                
