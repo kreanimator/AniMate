@@ -1,6 +1,7 @@
 """
 Transfer logic for AniMate Blender addon.
 """
+import math
 from mathutils import Euler, Vector, Matrix
 from typing import Any, Dict, Callable
 from ..utils.math_utils import remap
@@ -100,7 +101,6 @@ class TransferManager:
                 v2 = c - b
                 v1.normalize()
                 v2.normalize()
-                import math
                 dot = max(-1.0, min(1.0, v1.dot(v2)))
                 raw_angle = math.acos(dot)
 
@@ -130,7 +130,6 @@ class TransferManager:
             print(f"[AniMate][DEBUG] {finger_name} remapped_angle: {remapped_angle}")
             # Use the remapped angle directly without additional offset
             # This prevents fingers from being forced into a closed position
-            import math
             rotation = Euler((remapped_angle, 0, 0))
             rotation = self.apply_rotation_limits(full_bone_name, rotation)
             scale_factor = self.mapping.get_bone_scale_factors().get(finger_name, 1.0)
