@@ -14,7 +14,7 @@ A Blender plugin for animating humanoid rigs using motion capture data from Medi
 ### Features Implemented
 - Basic finger movement tracking and application to the rig
 - Core pose detection and tracking
-- Fundamental rig mapping for Mixamo rigs
+- Fundamental rig mapping for Mixamo and Rigify rigs
 
 ### Features Till Release
 - Smooth and natural movement of the fingers, hands, and arms
@@ -132,6 +132,24 @@ AniMate/
 5. Configure detection settings (pose, face, hands)
 6. Click "Start Capture" to begin motion capture
 7. Landmarks will be drawn on the camera preview, and the rig will animate in real time if mapping is correct
+
+### Using Sample scene
+
+When using different rig types (Rigify, Mixamo, etc.), it's important to manage which rigs are visible in your scene. The AniMate addon allows you to choose which rig type to use for motion capture, and you may want to hide other rigs to avoid visual clutter and ensure clear positioning:
+
+![Rigify Rig Visibility Settings](docs/images/rigify_rig_visibility.png)
+
+To set up your motion capture scene:
+1. Choose your target rig type in the AniMate panel (Rigify, Mixamo, etc.)
+2. Hide other rigs that you're not using for capture to keep the scene clean
+   - For example, if you're using a Rigify rig, you can hide the Mixamo rig
+   - If you're using a Mixamo rig, you can hide the Rigify rig
+3. For Rigify rigs specifically, you can also manage individual rig layers:
+   - Hide unnecessary rig layers that aren't being used for motion capture
+   - Keep only the layers containing the bones you want to animate
+   - Use the layer visibility toggles in the Armature properties panel
+
+This helps maintain a clean workspace and makes it easier to position and work with your chosen rig.
 
 ## Modularity & Extensibility
 
@@ -270,7 +288,11 @@ A sample Blender file is provided for development and testing:
 
 - **data/sample_scene_with_mixamo_rig.blend**
 
-This file contains a human mesh with a Mixamo rig and can be used as a test scene for AniMate development in Blender. Load this file to quickly test the addon with a compatible rig and mesh setup.
+This file contains multiple rigs (Mixamo and Rigify) for testing different rig types. **Important Note:** When using this sample scene, you need to hide the rig you're not currently using for motion capture. For example:
+- If you're testing with the Rigify rig, hide the Mixamo rig
+- If you're testing with the Mixamo rig, hide the Rigify rig
+
+This is necessary because the sample scene includes multiple rigs to demonstrate different rig types, but during actual motion capture, you should only have one active rig visible at a time.
 
 ## Planned Features & Future Releases
 
