@@ -9,6 +9,18 @@ A Blender plugin for animating humanoid rigs using motion capture data from Medi
 - Modular, extensible architecture with clear separation of detection, mapping, rig, UI, and utility logic
 - Configurable bone mappings for Mixamo, Rigify, and Maya rigs
 
+## Implementation Status
+
+### Features Implemented
+- Basic finger movement tracking and application to the rig
+- Core pose detection and tracking
+- Fundamental rig mapping for Mixamo rigs
+
+### Features Till Release
+- Smooth and natural movement of the fingers, hands, and arms
+- Enhanced motion filtering and stabilization
+- Improved accuracy in finger and hand tracking
+
 ## Project Status
 
 🚧 **Under Development** 🚧
@@ -150,10 +162,10 @@ AniMate is designed for easy extension:
    ```bash
    # Add upstream remote
    git remote add upstream https://github.com/kreanimator/AniMate.git
-   
+
    # Fetch upstream changes
    git fetch upstream
-   
+
    # Update your main branch
    git checkout main
    git merge upstream/main
@@ -264,6 +276,7 @@ This file contains a human mesh with a Mixamo rig and can be used as a test scen
 
 AniMate is actively evolving! Planned features for future releases include:
 
+- **Smooth and natural movement**: Enhanced finger, hand, and arm movement with improved motion filtering and stabilization.
 - **Motion capture from image/video files**: Animate rigs using prerecorded video or image sequences, not just live camera input.
 - **Multiple rig type support**: Seamless switching and mapping for Mixamo, Rigify, Maya, and custom rigs.
 - **Locked posing and region isolation**: Lock specific bones or regions (e.g., hands, feet, head) to prevent unwanted movement during capture.
@@ -274,3 +287,17 @@ AniMate is actively evolving! Planned features for future releases include:
 
 If you have feature requests or want to contribute, please open an issue or pull request!
 
+## Build Version Display
+
+AniMate displays the exact build version in its UI panel for easy debugging and version tracking. Every time you package the addon, a unique build string is generated and shown in Blender:
+
+![AniMate Build Version](docs/images/animate_build_version.png)
+
+**Example:**
+```
+AniMate Version: 0.1.0 (dev: build-2025-06-03_22-09-00-git-76cb7d3)
+```
+- `build-2025-06-03_22-09-00` is the build timestamp (YYYY-MM-DD_HH-MM-SS)
+- `git-76cb7d3` is the short git commit hash
+
+This ensures you always know which build is installed, helping to avoid confusion when testing or debugging new features.

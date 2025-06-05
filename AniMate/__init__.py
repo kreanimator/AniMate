@@ -1,3 +1,4 @@
+from .__dev_build__ import __dev_build__
 bl_info = {
     "name": "AniMate",
     "author": "Valentin Bakin",
@@ -9,6 +10,8 @@ bl_info = {
     "doc_url": "",
     "category": "Animation",
 }
+bl_info["description"] += f" (Build: {__dev_build__}) | GitHub: https://github.com/kreanimator/AniMate | Docs: https://docs.sosw.app/contribution/index.html"
+
 
 import bpy
 from .bpy_ui.panels import AniMateMainPanel
