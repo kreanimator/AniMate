@@ -9,6 +9,18 @@ A Blender plugin for animating humanoid rigs using motion capture data from Medi
 - Modular, extensible architecture with clear separation of detection, mapping, rig, UI, and utility logic
 - Configurable bone mappings for Mixamo, Rigify, and Maya rigs
 
+## Implementation Status
+
+### Features Implemented
+- Basic finger movement tracking and application to the rig
+- Core pose detection and tracking
+- Fundamental rig mapping for Mixamo and Rigify rigs
+
+### Features Till Release
+- Smooth and natural movement of the fingers, hands, and arms
+- Enhanced motion filtering and stabilization
+- Improved accuracy in finger and hand tracking
+
 ## Project Status
 
 🚧 **Under Development** 🚧
@@ -121,6 +133,24 @@ AniMate/
 6. Click "Start Capture" to begin motion capture
 7. Landmarks will be drawn on the camera preview, and the rig will animate in real time if mapping is correct
 
+### Using Sample scene
+
+When using different rig types (Rigify, Mixamo, etc.), it's important to manage which rigs are visible in your scene. The AniMate addon allows you to choose which rig type to use for motion capture, and you may want to hide other rigs to avoid visual clutter and ensure clear positioning:
+
+![Rigify Rig Visibility Settings](docs/images/rigify_rig_visibility.png)
+
+To set up your motion capture scene:
+1. Choose your target rig type in the AniMate panel (Rigify, Mixamo, etc.)
+2. Hide other rigs that you're not using for capture to keep the scene clean
+   - For example, if you're using a Rigify rig, you can hide the Mixamo rig
+   - If you're using a Mixamo rig, you can hide the Rigify rig
+3. For Rigify rigs specifically, you can also manage individual rig layers:
+   - Hide unnecessary rig layers that aren't being used for motion capture
+   - Keep only the layers containing the bones you want to animate
+   - Use the layer visibility toggles in the Armature properties panel
+
+This helps maintain a clean workspace and makes it easier to position and work with your chosen rig.
+
 ## Modularity & Extensibility
 
 AniMate is designed for easy extension:
@@ -150,10 +180,10 @@ AniMate is designed for easy extension:
    ```bash
    # Add upstream remote
    git remote add upstream https://github.com/kreanimator/AniMate.git
-   
+
    # Fetch upstream changes
    git fetch upstream
-   
+
    # Update your main branch
    git checkout main
    git merge upstream/main
@@ -258,12 +288,17 @@ A sample Blender file is provided for development and testing:
 
 - **data/sample_scene_with_mixamo_rig.blend**
 
-This file contains a human mesh with a Mixamo rig and can be used as a test scene for AniMate development in Blender. Load this file to quickly test the addon with a compatible rig and mesh setup.
+This file contains multiple rigs (Mixamo and Rigify) for testing different rig types. **Important Note:** When using this sample scene, you need to hide the rig you're not currently using for motion capture. For example:
+- If you're testing with the Rigify rig, hide the Mixamo rig
+- If you're testing with the Mixamo rig, hide the Rigify rig
+
+This is necessary because the sample scene includes multiple rigs to demonstrate different rig types, but during actual motion capture, you should only have one active rig visible at a time.
 
 ## Planned Features & Future Releases
 
 AniMate is actively evolving! Planned features for future releases include:
 
+- **Smooth and natural movement**: Enhanced finger, hand, and arm movement with improved motion filtering and stabilization.
 - **Motion capture from image/video files**: Animate rigs using prerecorded video or image sequences, not just live camera input.
 - **Multiple rig type support**: Seamless switching and mapping for Mixamo, Rigify, Maya, and custom rigs.
 - **Locked posing and region isolation**: Lock specific bones or regions (e.g., hands, feet, head) to prevent unwanted movement during capture.
@@ -274,3 +309,17 @@ AniMate is actively evolving! Planned features for future releases include:
 
 If you have feature requests or want to contribute, please open an issue or pull request!
 
+## Build Version Display
+
+AniMate displays the exact build version in its UI panel for easy debugging and version tracking. Every time you package the addon, a unique build string is generated and shown in Blender:
+
+![AniMate Build Version](docs/images/animate_build_version.png)
+
+**Example:**
+```
+AniMate Version: 0.1.0 (dev: build-2025-06-03_22-09-00-git-76cb7d3)
+```
+- `build-2025-06-03_22-09-00` is the build timestamp (YYYY-MM-DD_HH-MM-SS)
+- `git-76cb7d3` is the short git commit hash
+
+This ensures you always know which build is installed, helping to avoid confusion when testing or debugging new features.

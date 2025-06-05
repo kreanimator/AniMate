@@ -117,11 +117,22 @@ class ANIMATE_OT_start_capture(Operator):
             if props.enable_hands:
                 results_hands = self.mp_hands.process(frame)
                 print(f"[AniMate] Hand landmarks: {getattr(results_hands, 'multi_hand_landmarks', None)}")
-                if results_hands.multi_hand_landmarks:
-                    if len(results_hands.multi_hand_landmarks) > 0:
-                        left_hand_landmarks = results_hands.multi_hand_landmarks[0]
-                    if len(results_hands.multi_hand_landmarks) > 1:
-                        right_hand_landmarks = results_hands.multi_hand_landmarks[1]
+                left_hand_landmarks = None
+                right_hand_landmarks = None
+                if results_hands.multi_hand_landmarks and results_hands.multi_handedness:
+                    for idx, hand_landmarks in enumerate(results_hands.multi_hand_landmarks):
+                        handedness = results_hands.multi_handedness[idx].classification[0].label
+                        # When camera is mirrored, swap left and right hands
+                        if props.camera_mirrored:
+                            if handedness == 'Left':
+                                right_hand_landmarks = hand_landmarks
+                            elif handedness == 'Right':
+                                left_hand_landmarks = hand_landmarks
+                        else:
+                            if handedness == 'Left':
+                                left_hand_landmarks = hand_landmarks
+                            elif handedness == 'Right':
+                                right_hand_landmarks = hand_landmarks
             # Draw landmarks on the preview frame
             if pose_landmarks:
                 mp_drawing.draw_landmarks(

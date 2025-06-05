@@ -1,8 +1,10 @@
 """
 Transfer logic for AniMate Blender addon.
 """
+import math
 from mathutils import Euler, Vector, Matrix
 from typing import Any, Dict, Callable
+from ..utils.math_utils import remap
 
 class TransferManager:
     """Handles transfer of landmark data to Blender rig drivers."""
@@ -70,29 +72,73 @@ class TransferManager:
 
     def apply_hand_landmarks(self, world_coords: Dict[int, Vector], hand_mapping: Dict[str, Any], axis_corrections: Dict[str, Callable], rest_pose_rotations: Dict[str, Euler], is_right_hand: bool = True) -> None:
         """
-        Apply hand landmarks to the rig drivers.
+        Apply hands landmarks to the rig drivers.
         """
+        print(f"[AniMate] apply_hand_landmarks called for hand, is_right_hand={is_right_hand}")
+        print(f"[AniMate] apply_hand_landmarks mapping keys: {list(hand_mapping.keys())}")
+        remap_tables = self.mapping.get_hand_remap_table()
         for finger_name, joint_indices in hand_mapping.items():
-            if is_right_hand and not finger_name.endswith('.R'):
+            # Only update the correct hand
+            if is_right_hand and not finger_name.startswith("RightHand"):
                 continue
-            if not is_right_hand and not finger_name.endswith('.L'):
+            if not is_right_hand and not finger_name.startswith("LeftHand"):
                 continue
-            if finger_name not in self.driver_manager.driver_objects:
+            print(f"[AniMate] Checking {finger_name} with indices {joint_indices}")
+            full_bone_name = self.driver_manager.prefix + finger_name
+            if full_bone_name not in self.driver_manager.driver_objects:
+                print(f"[AniMate] SKIP: Bone {full_bone_name} not in driver objects")
                 continue
             if any(idx not in world_coords for idx in joint_indices):
+                print(f"[AniMate] SKIP: Not all indices present for bone {full_bone_name}")
                 continue
-            if len(joint_indices) == 2:
+            print(f"[AniMate] UPDATING: {full_bone_name} with indices {joint_indices}")
+            # Angle-based calculation for finger curl (if 3 indices)
+            if len(joint_indices) == 3:
+                a = world_coords[joint_indices[0]]
+                b = world_coords[joint_indices[1]]
+                c = world_coords[joint_indices[2]]
+                v1 = a - b
+                v2 = c - b
+                v1.normalize()
+                v2.normalize()
+                dot = max(-1.0, min(1.0, v1.dot(v2)))
+                raw_angle = math.acos(dot)
+
+                # # Additional check to prevent extreme movements
+                # # This helps prevent fingers from going through the palm
+                # max_angle = math.pi * 0.8  # Limit to 80% of 180 degrees
+                # raw_angle = min(raw_angle, max_angle)
+
+                print(f"[AniMate][DEBUG] {finger_name} raw_angle (angle): {raw_angle}")
+            elif len(joint_indices) == 2:
                 start_point = world_coords[joint_indices[0]]
                 end_point = world_coords[joint_indices[1]]
-                rotation = self.calculate_bone_rotation(start_point, end_point)
-                rotation = self.apply_rotation_limits(finger_name, rotation)
-                scale_factor = self.mapping.get_bone_scale_factors().get(finger_name, 1.0)
-                rotation = Euler((rotation.x * scale_factor, rotation.y * scale_factor, rotation.z * scale_factor))
-                axis_correction_fn = axis_corrections.get(finger_name, lambda e: e)
-                corrected_rot = axis_correction_fn(rotation)
-                rest_rot = rest_pose_rotations.get(finger_name, Euler((0, 0, 0)))
-                final_driver_rot = (rest_rot.to_matrix().inverted() @ corrected_rot.to_matrix()).to_euler()
-                self.driver_manager.update_driver(finger_name, final_driver_rot)
+                raw_angle = (end_point - start_point).length
+
+                # Additional check to prevent extreme movements
+                max_distance = 5.0  # Reasonable maximum distance
+                raw_angle = min(raw_angle, max_distance)
+
+                print(f"[AniMate][DEBUG] {finger_name} raw_angle (distance): {raw_angle}")
+            else:
+                continue
+            if finger_name in remap_tables:
+                in_rng, out_rng = remap_tables[finger_name]
+                remapped_angle = remap(raw_angle, *in_rng, *out_rng)
+            else:
+                remapped_angle = raw_angle  # fallback if not found
+            print(f"[AniMate][DEBUG] {finger_name} remapped_angle: {remapped_angle}")
+            # Use the remapped angle directly without additional offset
+            # This prevents fingers from being forced into a closed position
+            rotation = Euler((remapped_angle, 0, 0))
+            rotation = self.apply_rotation_limits(full_bone_name, rotation)
+            scale_factor = self.mapping.get_bone_scale_factors().get(finger_name, 1.0)
+            rotation = Euler((rotation.x * scale_factor, rotation.y * scale_factor, rotation.z * scale_factor))
+            axis_correction_fn = axis_corrections.get(full_bone_name, lambda e: e)
+            corrected_rot = axis_correction_fn(rotation)
+            rest_rot = rest_pose_rotations.get(full_bone_name, Euler((0, 0, 0)))
+            final_driver_rot = (rest_rot.to_matrix().inverted() @ corrected_rot.to_matrix()).to_euler()
+            self.driver_manager.update_driver(full_bone_name, final_driver_rot)
 
     def apply_face_landmarks(self, world_coords: Dict[int, Vector], face_mapping: Dict[str, Any], rest_pose_rotations: Dict[str, Euler]) -> None:
         """

@@ -111,37 +111,35 @@ class MixamoMapping(BaseRigMapping):
         }
 
     def get_hand_mapping(self):
+        # MediaPipe hand indices: https://google.github.io/mediapipe/solutions/hands.html#hand-landmark-model
+        # Thumb: CMC(1), MCP(2), IP(3), TIP(4)
+        # Index: MCP(5), PIP(6), DIP(7), TIP(8)
+        # Middle: MCP(9), PIP(10), DIP(11), TIP(12)
+        # Ring: MCP(13), PIP(14), DIP(15), TIP(16)
+        # Pinky: MCP(17), PIP(18), DIP(19), TIP(20)
         return {
-            "RightHandThumb1": [0, 1],
-            "RightHandThumb2": [1, 2],
-            "RightHandThumb3": [2, 3],
-            "RightHandIndex1": [0, 5],
-            "RightHandIndex2": [5, 6],
-            "RightHandIndex3": [6, 7],
-            "RightHandMiddle1": [0, 9],
-            "RightHandMiddle2": [9, 10],
-            "RightHandMiddle3": [10, 11],
-            "RightHandRing1": [0, 13],
-            "RightHandRing2": [13, 14],
-            "RightHandRing3": [14, 15],
-            "RightHandPinky1": [0, 17],
-            "RightHandPinky2": [17, 18],
-            "RightHandPinky3": [18, 19],
-            "LeftHandThumb1": [0, 1],
-            "LeftHandThumb2": [1, 2],
-            "LeftHandThumb3": [2, 3],
-            "LeftHandIndex1": [0, 5],
-            "LeftHandIndex2": [5, 6],
-            "LeftHandIndex3": [6, 7],
-            "LeftHandMiddle1": [0, 9],
-            "LeftHandMiddle2": [9, 10],
-            "LeftHandMiddle3": [10, 11],
-            "LeftHandRing1": [0, 13],
-            "LeftHandRing2": [13, 14],
-            "LeftHandRing3": [14, 15],
-            "LeftHandPinky1": [0, 17],
-            "LeftHandPinky2": [17, 18],
-            "LeftHandPinky3": [18, 19],
+            # Right hand fingers (use 3 indices for angle: base, mid, tip)
+            "RightHandThumb1": [1, 2, 3],
+            "RightHandThumb2": [2, 3, 4],
+            "RightHandIndex1": [5, 6, 7],
+            "RightHandIndex2": [6, 7, 8],
+            "RightHandMiddle1": [9, 10, 11],
+            "RightHandMiddle2": [10, 11, 12],
+            "RightHandRing1": [13, 14, 15],
+            "RightHandRing2": [14, 15, 16],
+            "RightHandPinky1": [17, 18, 19],
+            "RightHandPinky2": [18, 19, 20],
+            # Left hand fingers (same indices, MediaPipe always gives 21 landmarks per hand)
+            "LeftHandThumb1": [1, 2, 3],
+            "LeftHandThumb2": [2, 3, 4],
+            "LeftHandIndex1": [5, 6, 7],
+            "LeftHandIndex2": [6, 7, 8],
+            "LeftHandMiddle1": [9, 10, 11],
+            "LeftHandMiddle2": [10, 11, 12],
+            "LeftHandRing1": [13, 14, 15],
+            "LeftHandRing2": [14, 15, 16],
+            "LeftHandPinky1": [17, 18, 19],
+            "LeftHandPinky2": [18, 19, 20],
         }
 
     def get_bone_rotation_limits(self):
@@ -174,6 +172,28 @@ class MixamoMapping(BaseRigMapping):
             "LeftShoulder": 1.0,
             "LeftArm": 1.0,
             "LeftForeArm": 1.0,
+            # Right hand fingers
+            "RightHandThumb1": 2.0,
+            "RightHandThumb2": 2.0,
+            "RightHandIndex1": 2.0,
+            "RightHandIndex2": 2.0,
+            "RightHandMiddle1": 2.0,
+            "RightHandMiddle2": 2.0,
+            "RightHandRing1": 2.0,
+            "RightHandRing2": 2.0,
+            "RightHandPinky1": 2.0,
+            "RightHandPinky2": 2.0,
+            # Left hand fingers
+            "LeftHandThumb1": 2.0,
+            "LeftHandThumb2": 2.0,
+            "LeftHandIndex1": 2.0,
+            "LeftHandIndex2": 2.0,
+            "LeftHandMiddle1": 2.0,
+            "LeftHandMiddle2": 2.0,
+            "LeftHandRing1": 2.0,
+            "LeftHandRing2": 2.0,
+            "LeftHandPinky1": 2.0,
+            "LeftHandPinky2": 2.0,
         }
 
     def get_capabilities(self):
@@ -184,45 +204,79 @@ class MixamoMapping(BaseRigMapping):
 
     def get_axis_corrections(self):
         from mathutils import Euler
+        # Special handling for thumb to make it move more naturally
+        # For thumb, we use a different rotation pattern to make it more natural
+        # For other fingers, we invert the x-axis to make them bend correctly
         return {
-            # Torso
-            'mixamorig:Hips': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:Spine': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:Spine1': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:Spine2': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:Neck': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:Head': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:HeadTop_End': lambda e: Euler((e.x, e.y, e.z)),
-            # Shoulders
-            'mixamorig:RightShoulder': lambda e: Euler((e.x, e.y, e.z)),
-            'mixamorig:LeftShoulder': lambda e: Euler((e.x, e.y, e.z)),
-            # Arms (swap/invert Y as a starting point)
-            'mixamorig:RightArm': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:RightForeArm': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:RightHand': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftArm': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftForeArm': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftHand': lambda e: Euler((e.x, -e.y, e.z)),
-            # Fingers (identity, tune as needed)
-            **{f'mixamorig:RightHandThumb{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:RightHandIndex{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:RightHandMiddle{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:RightHandRing{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:RightHandPinky{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:LeftHandThumb{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:LeftHandIndex{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:LeftHandMiddle{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:LeftHandRing{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            **{f'mixamorig:LeftHandPinky{i}': lambda e: Euler((e.x, e.y, e.z)) for i in range(1, 5)},
-            # Legs (swap/invert Y as a starting point)
-            'mixamorig:RightUpLeg': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:RightLeg': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:RightFoot': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:RightToeBase': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:RightToe_End': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftUpLeg': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftLeg': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftFoot': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftToeBase': lambda e: Euler((e.x, -e.y, e.z)),
-            'mixamorig:LeftToe_End': lambda e: Euler((e.x, -e.y, e.z)),
-        } 
+            # Right hand thumb - special handling for more natural movement
+            **{f'mixamorig:RightHandThumb{i}': lambda e: Euler((-e.x, -e.y, e.z)) for i in range(1, 4)},
+            # Right hand other fingers
+            **{f'mixamorig:RightHandIndex{i}': lambda e: Euler((-e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:RightHandMiddle{i}': lambda e: Euler((-e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:RightHandRing{i}': lambda e: Euler((-e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:RightHandPinky{i}': lambda e: Euler((-e.x, e.y, e.z)) for i in range(1, 4)},
+            # Left hand thumb - special handling for more natural movement
+            **{f'mixamorig:LeftHandThumb{i}': lambda e: Euler((-e.x, -e.y, e.z)) for i in range(1, 4)},
+            # Left hand other fingers
+            **{f'mixamorig:LeftHandIndex{i}': lambda e: Euler((-e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:LeftHandMiddle{i}': lambda e: Euler((-e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:LeftHandRing{i}': lambda e: Euler((-e.x, e.y, e.z)) for i in range(1, 4)},
+            **{f'mixamorig:LeftHandPinky{i}': lambda e: Euler((-e.x, e.y, e.z)) for i in range(1, 4)},
+        }
+
+    def get_hand_remap_table(self):
+        """
+        Returns remap tables for all hand joints (both hands).
+        Each entry is a tuple: (input_range, output_range)
+
+        We use more restrictive output ranges to prevent fingers from going through the palm
+        when moved too fast or too much. This acts as a soft constraint.
+        """
+        # Standard input range for all fingers
+        wide_in = (0, 100)
+
+        # More restrictive output ranges to prevent fingers from going through the palm
+        # First joints (closest to palm) have more limited movement
+        first_joint_out = (0, 0.7)  # More limited range for first joints
+        middle_joint_out = (0, 0.8)  # Slightly more range for middle joints
+        tip_joint_out = (0, 0.9)    # Most range for tip joints
+
+        # Special range for thumb which needs more freedom
+        thumb_first_out = (0, 0.8)
+        thumb_other_out = (0, 0.9)
+
+        return {
+            # Right hand with constrained ranges
+            "RightHandThumb1.R":  (wide_in, thumb_first_out),
+            "RightHandThumb2.R":  (wide_in, thumb_other_out),
+            "RightHandThumb3.R":  (wide_in, thumb_other_out),
+            "RightHandIndex1.R":  (wide_in, first_joint_out),
+            "RightHandIndex2.R":  (wide_in, middle_joint_out),
+            "RightHandIndex3.R":  (wide_in, tip_joint_out),
+            "RightHandMiddle1.R": (wide_in, first_joint_out),
+            "RightHandMiddle2.R": (wide_in, middle_joint_out),
+            "RightHandMiddle3.R": (wide_in, tip_joint_out),
+            "RightHandRing1.R":   (wide_in, first_joint_out),
+            "RightHandRing2.R":   (wide_in, middle_joint_out),
+            "RightHandRing3.R":   (wide_in, tip_joint_out),
+            "RightHandPinky1.R":  (wide_in, first_joint_out),
+            "RightHandPinky2.R":  (wide_in, middle_joint_out),
+            "RightHandPinky3.R":  (wide_in, tip_joint_out),
+
+            # Left hand with constrained ranges
+            "LeftHandThumb1.L":  (wide_in, thumb_first_out),
+            "LeftHandThumb2.L":  (wide_in, thumb_other_out),
+            "LeftHandThumb3.L":  (wide_in, thumb_other_out),
+            "LeftHandIndex1.L":  (wide_in, first_joint_out),
+            "LeftHandIndex2.L":  (wide_in, middle_joint_out),
+            "LeftHandIndex3.L":  (wide_in, tip_joint_out),
+            "LeftHandMiddle1.L": (wide_in, first_joint_out),
+            "LeftHandMiddle2.L": (wide_in, middle_joint_out),
+            "LeftHandMiddle3.L": (wide_in, tip_joint_out),
+            "LeftHandRing1.L":   (wide_in, first_joint_out),
+            "LeftHandRing2.L":   (wide_in, middle_joint_out),
+            "LeftHandRing3.L":   (wide_in, tip_joint_out),
+            "LeftHandPinky1.L":  (wide_in, first_joint_out),
+            "LeftHandPinky2.L":  (wide_in, middle_joint_out),
+            "LeftHandPinky3.L":  (wide_in, tip_joint_out),
+        }

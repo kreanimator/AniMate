@@ -1,6 +1,7 @@
 import bpy
 from bpy.types import Panel
 from .properties import AniMateProperties
+from ..utils.version import get_addon_version_string
 
 def split_and_set_image_editor(img_name):
     window = bpy.context.window
@@ -47,6 +48,8 @@ class AniMateMainPanel(Panel):
     def draw(self, context):
         layout = self.layout
         props = context.scene.animate_properties
+        # Display version/build info
+        layout.label(text=f"AniMate Version: {get_addon_version_string()}")
         layout.prop(props, "rig_type")
         layout.prop(props, "target_armature")
         box = layout.box()

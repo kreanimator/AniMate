@@ -154,16 +154,16 @@ class BlenderRigMapper:
             landmarks: MediaPipe hand landmarks
             is_right_hand: Whether this is the right hand
         """
+        print(f"[AniMate] process_hand_landmarks called, is_right_hand={is_right_hand}, landmarks_present={landmarks is not None}")
         if not self.armature or not landmarks:
             logger.warning("No armature or landmarks for hand processing")
             return
-            
         world_coords = {}
         for i, landmark in enumerate(landmarks.landmark):
-            if hasattr(landmark, 'visibility') and landmark.visibility > 0.5:
-                world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
-                
+            # For hands, do NOT check visibility (always 21 landmarks)
+            world_coords[i] = Vector((landmark.x, -landmark.z, landmark.y))
         hand_mapping = self.mapping.get_hand_mapping()
+        print(f"[AniMate] hand_mapping keys: {list(hand_mapping.keys())}")
         self.transfer_manager.apply_hand_landmarks(
             world_coords,
             hand_mapping,
@@ -456,4 +456,3 @@ class BlenderRigMapper:
             current_rotation.y + (new_rotation.y - current_rotation.y) * self.motion_smoothing,
             current_rotation.z + (new_rotation.z - current_rotation.z) * self.motion_smoothing
         ))
-

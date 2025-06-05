@@ -72,3 +72,4 @@ class DriverManager:
                 for c in list(pose_bone.constraints):
                     if c.name.startswith("AniMate_CopyRot"):
                         pose_bone.constraints.remove(c) 
+                        
