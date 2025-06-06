@@ -4,7 +4,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from ..rig.blender_mapper import BlenderRigMapper
-from .panels import split_and_set_image_editor, close_image_editor
+from .panels import split_and_set_image_editor, close_image_editor, restore_single_3d_view
 from ..utils.math_utils import mediapipe_to_blender_coords, mediapipe_to_blender_coords_pose
 
 mp_drawing = mp.solutions.drawing_utils
@@ -239,9 +239,10 @@ class ANIMATE_OT_stop_capture(Operator):
     def execute(self, context):
         # Close the preview window if it was opened
         if context.scene.animate_properties.show_camera_preview:
-            from .panels import close_image_editor
+            from .panels import close_image_editor, restore_single_3d_view
             close_image_editor()
-            print("[AniMate] Preview window closed by stop operator.")
+            restore_single_3d_view()
+            print("[AniMate] Preview window closed and single 3D View restored by stop operator.")
 
         # Set the flag to False to trigger the modal operator's cancel method
         context.scene.animate_running = False

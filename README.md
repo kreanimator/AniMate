@@ -100,9 +100,7 @@ AniMate/
 │   ├── base_mappings.py
 │   ├── mapping_factory.py
 │   ├── __init__.py
-│   ├── README.md
-│   ├── README.txt
-│   └── README.rst
+│   └── README.md
 ├── rig/                   # Rig management, driver, and transfer logic
 │   ├── blender_mapper.py
 │   ├── drivers.py
