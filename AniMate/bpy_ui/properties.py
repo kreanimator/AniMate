@@ -3,10 +3,15 @@ from bpy.props import BoolProperty, PointerProperty, StringProperty, EnumPropert
 from bpy.types import PropertyGroup
 
 class AniMateProperties(PropertyGroup):
+    debug_mode: BoolProperty(
+        name="Debug Mode",
+        description="Enable debug output in console",
+        default=False
+    )
     enable_pose: BoolProperty(
         name="Enable Pose",
         description="Enable pose detection",
-        default=False
+        default=True
     )
     enable_face: BoolProperty(
         name="Enable Face",

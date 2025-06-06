@@ -4,7 +4,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from ..rig.blender_mapper import BlenderRigMapper
-from .panels import split_and_set_image_editor
+from .panels import split_and_set_image_editor, close_image_editor
 from ..utils.math_utils import mediapipe_to_blender_coords, mediapipe_to_blender_coords_pose
 
 mp_drawing = mp.solutions.drawing_utils
@@ -103,20 +103,23 @@ class ANIMATE_OT_start_capture(Operator):
             face_landmarks = None
             left_hand_landmarks = None
             right_hand_landmarks = None
-            # MediaPipe detection with debug prints
+            # MediaPipe detection
             if props.enable_pose:
                 results_pose = self.mp_pose.process(frame)
-                print(f"[AniMate] Pose landmarks: {getattr(results_pose, 'pose_landmarks', None)}")
+                if props.debug_mode:
+                    print(f"[AniMate] Pose landmarks: {getattr(results_pose, 'pose_landmarks', None)}")
                 if results_pose.pose_landmarks:
                     pose_landmarks = results_pose.pose_landmarks
             if props.enable_face:
                 results_face = self.mp_face.process(frame)
-                print(f"[AniMate] Face landmarks: {getattr(results_face, 'multi_face_landmarks', None)}")
+                if props.debug_mode:
+                    print(f"[AniMate] Face landmarks: {getattr(results_face, 'multi_face_landmarks', None)}")
                 if results_face.multi_face_landmarks:
                     face_landmarks = results_face.multi_face_landmarks[0]
             if props.enable_hands:
                 results_hands = self.mp_hands.process(frame)
-                print(f"[AniMate] Hand landmarks: {getattr(results_hands, 'multi_hand_landmarks', None)}")
+                if props.debug_mode:
+                    print(f"[AniMate] Hand landmarks: {getattr(results_hands, 'multi_hand_landmarks', None)}")
                 left_hand_landmarks = None
                 right_hand_landmarks = None
                 if results_hands.multi_hand_landmarks and results_hands.multi_handedness:
@@ -176,7 +179,8 @@ class ANIMATE_OT_start_capture(Operator):
                 for lm in right_hand_landmarks.landmark:
                     lm.x, lm.y, lm.z = mediapipe_to_blender_coords(lm, w, h, flip_x=flip_x)
             # Debug print before rig update
-            print(f"[AniMate] Updating rig: pose={pose_landmarks is not None}, face={face_landmarks is not None}, left_hand={left_hand_landmarks is not None}, right_hand={right_hand_landmarks is not None}")
+            if props.debug_mode:
+                print(f"[AniMate] Updating rig: pose={pose_landmarks is not None}, face={face_landmarks is not None}, left_hand={left_hand_landmarks is not None}, right_hand={right_hand_landmarks is not None}")
             # Update the rig with the detected landmarks
             if self._mapper:
                 self._mapper.update_rig(
@@ -218,6 +222,11 @@ class ANIMATE_OT_start_capture(Operator):
         if self._mapper:
             self._mapper.driver_manager.cleanup()
             self._mapper = None
+
+        # Note: We don't close the image editor here anymore
+        # It's now handled exclusively by the stop_capture operator
+        # to avoid double calls to close_image_editor()
+
         context.scene.animate_running = False
         self.report({'INFO'}, "Capture stopped")
         print("[AniMate] Capture stopped and cleaned up.")
@@ -228,6 +237,13 @@ class ANIMATE_OT_stop_capture(Operator):
     bl_description = "Stop motion capture"
 
     def execute(self, context):
+        # Close the preview window if it was opened
+        if context.scene.animate_properties.show_camera_preview:
+            from .panels import close_image_editor
+            close_image_editor()
+            print("[AniMate] Preview window closed by stop operator.")
+
+        # Set the flag to False to trigger the modal operator's cancel method
         context.scene.animate_running = False
         self.report({'INFO'}, "Capture stopped")
         print("[AniMate] animate_running set to False by stop operator.")
