@@ -48,4 +48,9 @@ class AniMateProperties(PropertyGroup):
             ('MAYA', 'Maya', 'Maya Rig'),
         ],
         default='MIXAMO',
+    )
+    animate_last_workspace: StringProperty(
+        name="Last Workspace",
+        description="Workspace to restore after capture",
+        default=""
     ) 

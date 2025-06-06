@@ -1,4 +1,6 @@
 import bpy
+import threading
+import time
 from bpy.types import Operator
 import cv2
 import mediapipe as mp
@@ -84,6 +86,8 @@ class ANIMATE_OT_start_capture(Operator):
         wm.modal_handler_add(self)
         self.report({'INFO'}, "Capture started")
         print("[AniMate] Capture started, modal operator running.")
+        # Store the current workspace name
+        context.scene.animate_properties.animate_last_workspace = bpy.context.workspace.name
         return {'RUNNING_MODAL'}
 
     def modal(self, context, event):
@@ -239,10 +243,28 @@ class ANIMATE_OT_stop_capture(Operator):
     def execute(self, context):
         # Close the preview window if it was opened
         if context.scene.animate_properties.show_camera_preview:
-            from .panels import close_image_editor, restore_single_3d_view
             close_image_editor()
             restore_single_3d_view()
             print("[AniMate] Preview window closed and single 3D View restored by stop operator.")
+
+        # Switch to default workspace (e.g., 'Layout')
+        for ws in bpy.data.workspaces:
+            if ws.name == "Layout":
+                bpy.context.window.workspace = ws
+                print("[AniMate] Switched to 'Layout' workspace for area reset.")
+                break
+
+        # Restore user's original workspace after a short delay using bpy.app.timers
+        def restore_user_workspace():
+            ws_name = context.scene.animate_properties.animate_last_workspace
+            if ws_name:
+                for ws in bpy.data.workspaces:
+                    if ws.name == ws_name:
+                        bpy.context.window.workspace = ws
+                        print(f"[AniMate] Restored user's original workspace: {ws_name}")
+                        break
+            return None  # Do not repeat
+        bpy.app.timers.register(restore_user_workspace, first_interval=0.5)
 
         # Set the flag to False to trigger the modal operator's cancel method
         context.scene.animate_running = False
