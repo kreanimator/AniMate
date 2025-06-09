@@ -241,11 +241,68 @@ class ANIMATE_OT_stop_capture(Operator):
     bl_description = "Stop motion capture"
 
     def execute(self, context):
+        from .panels import is_area_valid
+
         # Close the preview window if it was opened
         if context.scene.animate_properties.show_camera_preview:
+            print("[AniMate] Closing preview window...")
             close_image_editor()
             restore_single_3d_view()
             print("[AniMate] Preview window closed and single 3D View restored by stop operator.")
+
+            # Double-check that we have only one VIEW_3D area
+            window = bpy.context.window
+            screen = window.screen
+            view3d_areas = [area for area in screen.areas if area.type == 'VIEW_3D' and is_area_valid(area)]
+
+            print(f"[AniMate] After restore_single_3d_view: {len(view3d_areas)} VIEW_3D areas")
+
+            # If we still have multiple VIEW_3D areas, try a more direct approach
+            if len(view3d_areas) > 1:
+                print(f"[AniMate] Still have {len(view3d_areas)} VIEW_3D areas, trying a more direct approach")
+
+                # Try to join all VIEW_3D areas into the largest one
+                try:
+                    # Get the largest VIEW_3D area
+                    main_area = max(view3d_areas, key=lambda a: a.width * a.height)
+                    print(f"[AniMate] Main area for direct join: {main_area}, size: {main_area.width}x{main_area.height}")
+
+                    # Join all other VIEW_3D areas into the main area
+                    for area in list(view3d_areas):
+                        if area != main_area and is_area_valid(area) and is_area_valid(main_area):
+                            try:
+                                print(f"[AniMate] Direct join attempt: {area} into {main_area}")
+                                # Count areas before joining
+                                areas_before = len([a for a in screen.areas if is_area_valid(a)])
+
+                                # Calculate the cursor position for joining
+                                from .panels import calculate_join_cursor_position
+                                cursor_pos = calculate_join_cursor_position(area, main_area)
+                                print(f"[AniMate] Joining areas with cursor at {cursor_pos}")
+
+                                # Use C-style override context
+                                with bpy.context.temp_override(window=window, screen=screen, area=area):
+                                    # Set the mouse cursor position
+                                    bpy.context.window.cursor_warp(cursor_pos[0], cursor_pos[1])
+                                    # Join the areas
+                                    bpy.ops.screen.area_join()
+
+                                # Count areas after joining
+                                areas_after = len([a for a in screen.areas if is_area_valid(a)])
+
+                                # Verify that the area was actually joined
+                                if areas_after < areas_before:
+                                    print(f"[AniMate] Successfully joined areas directly. Areas before: {areas_before}, after: {areas_after}")
+                                else:
+                                    print(f"[AniMate] Direct area join didn't decrease area count. Areas before: {areas_before}, after: {areas_after}")
+                            except Exception as e:
+                                print(f"[AniMate] Direct join failed: {e}")
+                except Exception as e:
+                    print(f"[AniMate] Error in direct join approach: {e}")
+
+                # Final check
+                view3d_areas = [area for area in screen.areas if area.type == 'VIEW_3D' and is_area_valid(area)]
+                print(f"[AniMate] Final check: {len(view3d_areas)} VIEW_3D areas")
 
         # Switch to default workspace (e.g., 'Layout')
         for ws in bpy.data.workspaces:
@@ -270,4 +327,4 @@ class ANIMATE_OT_stop_capture(Operator):
         context.scene.animate_running = False
         self.report({'INFO'}, "Capture stopped")
         print("[AniMate] animate_running set to False by stop operator.")
-        return {'FINISHED'} 
+        return {'FINISHED'}

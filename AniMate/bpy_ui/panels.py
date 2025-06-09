@@ -20,6 +20,38 @@ def is_area_valid(area):
     except ReferenceError:
         return False
 
+def calculate_join_cursor_position(area1, area2):
+    """
+    Calculate the cursor position for joining two areas.
+    The cursor position needs to be between the two areas.
+
+    Args:
+        area1: The first area
+        area2: The second area
+
+    Returns:
+        tuple: (x, y) cursor position for the join operation
+    """
+    # Determine if areas are side by side or one above the other
+    if area1.x < area2.x:
+        # area1 is to the left of area2
+        cursor_x = area1.x + area1.width
+        cursor_y = area2.y + 2  # Add a small offset to avoid issues
+    elif area1.x > area2.x:
+        # area1 is to the right of area2
+        cursor_x = area2.x + area2.width
+        cursor_y = area1.y + 2
+    elif area1.y < area2.y:
+        # area1 is below area2
+        cursor_x = area2.x + 2
+        cursor_y = area1.y + area1.height
+    else:
+        # area1 is above area2
+        cursor_x = area1.x + 2
+        cursor_y = area2.y + area2.height
+
+    return (cursor_x, cursor_y)
+
 def split_and_set_image_editor(img_name):
     """
     Split the current area and set one half to an image editor with the specified image.
@@ -44,8 +76,15 @@ def split_and_set_image_editor(img_name):
                     # Double-check that both areas are still valid before joining
                     if is_area_valid(area) and is_area_valid(main_area):
                         try:
+                            # Calculate the cursor position for joining
+                            cursor_pos = calculate_join_cursor_position(area, main_area)
+                            print(f"[AniMate] Joining areas with cursor at {cursor_pos}")
+
                             # Use C-style override context
                             with bpy.context.temp_override(window=window, screen=screen, area=area):
+                                # Set the mouse cursor position
+                                bpy.context.window.cursor_warp(cursor_pos[0], cursor_pos[1])
+                                # Join the areas
                                 bpy.ops.screen.area_join()
                         except Exception as e:
                             print(f"[AniMate] Area join failed in inner try block: {e}")
@@ -95,6 +134,9 @@ def merge_view3d_areas(window, screen, view3d_areas):
         screen: The current Blender screen
         view3d_areas: List of VIEW_3D areas to merge
     """
+    # Log the number of areas before merging
+    print(f"[AniMate] Before merging: {len(view3d_areas)} VIEW_3D areas, {len(screen.areas)} total areas")
+
     if len(view3d_areas) <= 1:
         print("[AniMate] Only one VIEW_3D area found, no merging needed.")
         return
@@ -113,29 +155,56 @@ def merge_view3d_areas(window, screen, view3d_areas):
             try:
                 # Check if the area is still valid
                 if not is_area_valid(area):
+                    print(f"[AniMate] Area {area} is no longer valid, skipping")
                     continue
 
                 # Check if the main area is still valid
                 if not is_area_valid(main_area):
+                    print(f"[AniMate] Main area {main_area} is no longer valid, finding a new one")
                     # Find a new main area from the remaining areas
                     remaining_areas = [a for a in screen.areas if a.type == 'VIEW_3D' and a != area]
                     if not remaining_areas:
+                        print("[AniMate] No more areas to join with, breaking")
                         break  # No more areas to join with
                     main_area = max(remaining_areas, key=lambda a: a.width * a.height)
+                    print(f"[AniMate] New main area: {main_area}, size: {main_area.width}x{main_area.height}")
 
                 # Double-check that both areas are still valid before joining
                 if is_area_valid(area) and is_area_valid(main_area):
+                    print(f"[AniMate] Attempting to join {area} with main area {main_area}")
                     try:
+                        # Calculate the cursor position for joining
+                        cursor_pos = calculate_join_cursor_position(area, main_area)
+                        print(f"[AniMate] Joining VIEW_3D areas with cursor at {cursor_pos}")
+
+                        # Count areas before joining
+                        areas_before = len([a for a in screen.areas if is_area_valid(a)])
+
                         # Use C-style override context
                         with bpy.context.temp_override(window=window, screen=screen, area=area):
+                            # Set the mouse cursor position
+                            bpy.context.window.cursor_warp(cursor_pos[0], cursor_pos[1])
+                            # Join the areas
                             bpy.ops.screen.area_join()
-                        print("[AniMate] Successfully merged VIEW_3D areas.")
+
+                        # Count areas after joining
+                        areas_after = len([a for a in screen.areas if is_area_valid(a)])
+
+                        # Verify that the area was actually joined
+                        if areas_after < areas_before:
+                            print(f"[AniMate] Successfully merged VIEW_3D areas. Areas before: {areas_before}, after: {areas_after}")
+                        else:
+                            print(f"[AniMate] Area join reported success but area count didn't decrease. Areas before: {areas_before}, after: {areas_after}")
                     except Exception as e:
                         print(f"[AniMate] Area join failed in inner try block: {e}")
                 else:
                     print(f"[AniMate] One or both areas are no longer valid, skipping join operation")
             except Exception as e:
                 print(f"[AniMate] Failed to merge VIEW_3D areas: {e}")
+
+    # Log the number of areas after merging
+    view3d_areas_after = [area for area in screen.areas if area.type == 'VIEW_3D' and is_area_valid(area)]
+    print(f"[AniMate] After merging: {len(view3d_areas_after)} VIEW_3D areas, {len(screen.areas)} total areas")
 
 def close_image_editor():
     """
@@ -146,8 +215,23 @@ def close_image_editor():
         window = bpy.context.window
         screen = window.screen
 
+        # Log the initial state of areas
+        total_areas_before = len(screen.areas)
+        print(f"[AniMate] Initial state: {total_areas_before} total areas")
+
+        # Count areas by type
+        area_types = {}
+        for area in screen.areas:
+            if is_area_valid(area):
+                if area.type not in area_types:
+                    area_types[area.type] = 0
+                area_types[area.type] += 1
+
+        print(f"[AniMate] Areas by type: {area_types}")
+
         # Find the IMAGE_EDITOR area (ensure they are valid)
         image_editor_areas = [area for area in screen.areas if area.type == 'IMAGE_EDITOR' and is_area_valid(area)]
+        print(f"[AniMate] Found {len(image_editor_areas)} IMAGE_EDITOR areas")
 
         if not image_editor_areas:
             print("[AniMate] No image editor found to close.")
@@ -155,13 +239,15 @@ def close_image_editor():
 
         # Find a VIEW_3D area to merge with (ensure they are valid)
         view3d_areas = [area for area in screen.areas if area.type == 'VIEW_3D' and is_area_valid(area)]
+        print(f"[AniMate] Found {len(view3d_areas)} VIEW_3D areas")
 
         if not view3d_areas:
             # If no VIEW_3D area exists, convert the image editor to VIEW_3D
             for area in image_editor_areas:
                 try:
+                    print(f"[AniMate] Converting IMAGE_EDITOR area {area} to VIEW_3D")
                     area.type = 'VIEW_3D'
-                    print(f"[AniMate] Converted area {area} to VIEW_3D")
+                    print(f"[AniMate] Successfully converted area {area} to VIEW_3D")
                 except Exception as e:
                     print(f"[AniMate] Failed to convert area to VIEW_3D: {e}")
             print("[AniMate] Converted image editor to 3D view.")
@@ -181,6 +267,7 @@ def close_image_editor():
 
         # Update the list of VIEW_3D areas in case it changed (ensure they are valid)
         view3d_areas = [area for area in screen.areas if area.type == 'VIEW_3D' and is_area_valid(area)]
+        print(f"[AniMate] Updated VIEW_3D areas count: {len(view3d_areas)}")
 
         # If there are no VIEW_3D areas, we can't continue with joining
         if not view3d_areas:
@@ -189,6 +276,7 @@ def close_image_editor():
 
         # Get the largest VIEW_3D area
         main_area = max(view3d_areas, key=lambda a: a.width * a.height)
+        print(f"[AniMate] Main VIEW_3D area for joining: {main_area}, size: {main_area.width}x{main_area.height}")
 
         # Join the image editor areas with the main VIEW_3D area
         # Make a copy of the list to avoid modification during iteration
@@ -215,22 +303,44 @@ def close_image_editor():
 
                 # Double-check that both areas are still valid before joining
                 if is_area_valid(area) and is_area_valid(main_area):
+                    print(f"[AniMate] Attempting to join {area} with main area {main_area}")
                     try:
+                        # Calculate the cursor position for joining
+                        cursor_pos = calculate_join_cursor_position(area, main_area)
+                        print(f"[AniMate] Joining image editor with 3D view at cursor position {cursor_pos}")
+
+                        # Count areas before joining
+                        areas_before = len([a for a in screen.areas if is_area_valid(a)])
+
                         # Use C-style override context
                         with bpy.context.temp_override(window=window, screen=screen, area=area):
+                            # Set the mouse cursor position
+                            bpy.context.window.cursor_warp(cursor_pos[0], cursor_pos[1])
+                            # Join the areas
                             bpy.ops.screen.area_join()
-                        print("[AniMate] Successfully joined image editor with 3D view.")
+
+                        # Count areas after joining
+                        areas_after = len([a for a in screen.areas if is_area_valid(a)])
+
+                        # Verify that the area was actually joined
+                        if areas_after < areas_before:
+                            print(f"[AniMate] Successfully joined image editor with 3D view. Areas before: {areas_before}, after: {areas_after}")
+                        else:
+                            print(f"[AniMate] Area join reported success but area count didn't decrease. Areas before: {areas_before}, after: {areas_after}")
+                            # If joining didn't decrease the area count, convert to VIEW_3D
+                            print(f"[AniMate] Converting area {area} to VIEW_3D as fallback")
+                            area.type = 'VIEW_3D'
                     except Exception as e:
                         print(f"[AniMate] Area join failed in inner try block: {e}")
                         # If joining fails, convert to VIEW_3D
+                        print(f"[AniMate] Converting area {area} to VIEW_3D after join failure")
                         area.type = 'VIEW_3D'
-                        print(f"[AniMate] Converted area to VIEW_3D after join failure")
                 else:
                     print(f"[AniMate] One or both areas are no longer valid, skipping join operation")
                     # If the area is still valid, convert it to VIEW_3D
                     if is_area_valid(area):
+                        print(f"[AniMate] Converting area {area} to VIEW_3D because main area is invalid")
                         area.type = 'VIEW_3D'
-                        print(f"[AniMate] Converted area to VIEW_3D because main area is invalid")
             except Exception as e:
                 try:
                     # If joining fails, just convert to VIEW_3D if the area is still valid
@@ -240,7 +350,6 @@ def close_image_editor():
 
                         # After converting to VIEW_3D, we need to merge it with other VIEW_3D areas
                         # This is crucial to avoid ending up with multiple VIEW_3D areas
-                        # Wait a moment to ensure the area type change is processed
                         view3d_areas = [a for a in screen.areas if a.type == 'VIEW_3D' and is_area_valid(a)]
                         if len(view3d_areas) > 1:
                             print(f"[AniMate] After conversion, found {len(view3d_areas)} VIEW_3D areas, merging them...")
@@ -258,11 +367,28 @@ def close_image_editor():
             window = bpy.context.window
             screen = window.screen
             view3d_areas = [area for area in screen.areas if area.type == 'VIEW_3D' and is_area_valid(area)]
+
+            print(f"[AniMate] Final check: found {len(view3d_areas)} VIEW_3D areas")
+
             if len(view3d_areas) > 1:
                 print(f"[AniMate] Found {len(view3d_areas)} VIEW_3D areas, merging them...")
                 merge_view3d_areas(window, screen, view3d_areas)
             else:
                 print(f"[AniMate] Only found {len(view3d_areas)} VIEW_3D area, no merging needed.")
+
+            # Log the final state of areas
+            total_areas_after = len(screen.areas)
+            print(f"[AniMate] Final state: {total_areas_after} total areas (started with {total_areas_before})")
+
+            # Count areas by type
+            area_types = {}
+            for area in screen.areas:
+                if is_area_valid(area):
+                    if area.type not in area_types:
+                        area_types[area.type] = 0
+                    area_types[area.type] += 1
+
+            print(f"[AniMate] Final areas by type: {area_types}")
         except Exception as e:
             print(f"[AniMate] Failed to merge VIEW_3D areas: {e}")
 
@@ -278,29 +404,100 @@ def restore_single_3d_view():
         window = bpy.context.window
         screen = window.screen
 
+        # Log the initial state of areas
+        total_areas_before = len(screen.areas)
+        print(f"[AniMate] restore_single_3d_view: Initial state: {total_areas_before} total areas")
+
+        # Count areas by type
+        area_types = {}
+        for area in screen.areas:
+            if is_area_valid(area):
+                if area.type not in area_types:
+                    area_types[area.type] = 0
+                area_types[area.type] += 1
+
+        print(f"[AniMate] restore_single_3d_view: Areas by type: {area_types}")
+
         # Convert all IMAGE_EDITOR areas to VIEW_3D
         image_editor_areas = [area for area in screen.areas if area.type == 'IMAGE_EDITOR' and is_area_valid(area)]
+        print(f"[AniMate] restore_single_3d_view: Found {len(image_editor_areas)} IMAGE_EDITOR areas to convert")
+
         for area in image_editor_areas:
             try:
+                print(f"[AniMate] restore_single_3d_view: Converting IMAGE_EDITOR area {area} to VIEW_3D")
                 area.type = 'VIEW_3D'
-                print(f"[AniMate] Converted IMAGE_EDITOR area {area} to VIEW_3D")
+                print(f"[AniMate] restore_single_3d_view: Successfully converted area {area} to VIEW_3D")
             except Exception as e:
-                print(f"[AniMate] Failed to convert IMAGE_EDITOR to VIEW_3D: {e}")
+                print(f"[AniMate] restore_single_3d_view: Failed to convert IMAGE_EDITOR to VIEW_3D: {e}")
 
         # Merge all VIEW_3D areas into the largest one
         view3d_areas = [area for area in screen.areas if area.type == 'VIEW_3D' and is_area_valid(area)]
+        print(f"[AniMate] restore_single_3d_view: Found {len(view3d_areas)} VIEW_3D areas to merge")
+
         if len(view3d_areas) > 1:
-            print(f"[AniMate] Merging {len(view3d_areas)} VIEW_3D areas...")
-            merge_view3d_areas(window, screen, view3d_areas)
+            print(f"[AniMate] restore_single_3d_view: Merging {len(view3d_areas)} VIEW_3D areas...")
+
+            # Try a more direct approach to merge areas if there are exactly 2 VIEW_3D areas
+            if len(view3d_areas) == 2:
+                try:
+                    area1, area2 = view3d_areas
+                    print(f"[AniMate] restore_single_3d_view: Direct merge of {area1} and {area2}")
+
+                    # Count areas before joining
+                    areas_before = len([a for a in screen.areas if is_area_valid(a)])
+
+                    # Calculate the cursor position for joining
+                    cursor_pos = calculate_join_cursor_position(area1, area2)
+                    print(f"[AniMate] restore_single_3d_view: Joining VIEW_3D areas with cursor at {cursor_pos}")
+
+                    # Use C-style override context
+                    with bpy.context.temp_override(window=window, screen=screen, area=area1):
+                        # Set the mouse cursor position
+                        bpy.context.window.cursor_warp(cursor_pos[0], cursor_pos[1])
+                        # Join the areas
+                        bpy.ops.screen.area_join()
+
+                    # Count areas after joining
+                    areas_after = len([a for a in screen.areas if is_area_valid(a)])
+
+                    # Verify that the area was actually joined
+                    if areas_after < areas_before:
+                        print(f"[AniMate] restore_single_3d_view: Successfully merged VIEW_3D areas directly. Areas before: {areas_before}, after: {areas_after}")
+                    else:
+                        print(f"[AniMate] restore_single_3d_view: Direct area join didn't decrease area count. Areas before: {areas_before}, after: {areas_after}")
+                        # Fall back to the standard merge approach
+                        merge_view3d_areas(window, screen, view3d_areas)
+                except Exception as e:
+                    print(f"[AniMate] restore_single_3d_view: Direct merge failed: {e}, falling back to standard merge")
+                    merge_view3d_areas(window, screen, view3d_areas)
+            else:
+                # Use the standard merge approach for more than 2 areas
+                merge_view3d_areas(window, screen, view3d_areas)
         else:
-            print(f"[AniMate] Only found {len(view3d_areas)} VIEW_3D area, no merging needed.")
+            print(f"[AniMate] restore_single_3d_view: Only found {len(view3d_areas)} VIEW_3D area, no merging needed.")
 
         # Force a full UI redraw
         try:
             bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
-            print("[AniMate] Forced full UI redraw after area merge.")
+            print("[AniMate] restore_single_3d_view: Forced full UI redraw after area merge.")
         except Exception as e:
-            print(f"[AniMate] Failed to force UI redraw: {e}")
+            print(f"[AniMate] restore_single_3d_view: Failed to force UI redraw: {e}")
+
+        # Log the final state of areas
+        view3d_areas_after = [area for area in screen.areas if area.type == 'VIEW_3D' and is_area_valid(area)]
+        total_areas_after = len(screen.areas)
+        print(f"[AniMate] restore_single_3d_view: Final state: {total_areas_after} total areas (started with {total_areas_before})")
+        print(f"[AniMate] restore_single_3d_view: Final VIEW_3D areas: {len(view3d_areas_after)}")
+
+        # Count areas by type
+        area_types = {}
+        for area in screen.areas:
+            if is_area_valid(area):
+                if area.type not in area_types:
+                    area_types[area.type] = 0
+                area_types[area.type] += 1
+
+        print(f"[AniMate] restore_single_3d_view: Final areas by type: {area_types}")
 
         print("[AniMate] Restored single 3D View area (leaving other area types untouched).")
     except Exception as e:
