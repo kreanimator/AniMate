@@ -6,7 +6,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from ..rig.blender_mapper import BlenderRigMapper
-from .panels import split_and_set_image_editor, close_image_editor, restore_single_3d_view
+from .panels import split_and_set_image_editor, close_image_editor, restore_single_3d_view, join_areas_direct
 from ..utils.math_utils import mediapipe_to_blender_coords, mediapipe_to_blender_coords_pose
 
 mp_drawing = mp.solutions.drawing_utils
@@ -272,29 +272,12 @@ class ANIMATE_OT_stop_capture(Operator):
                         if area != main_area and is_area_valid(area) and is_area_valid(main_area):
                             try:
                                 print(f"[AniMate] Direct join attempt: {area} into {main_area}")
-                                # Count areas before joining
-                                areas_before = len([a for a in screen.areas if is_area_valid(a)])
-
-                                # Calculate the cursor position for joining
-                                from .panels import calculate_join_cursor_position
-                                cursor_pos = calculate_join_cursor_position(area, main_area)
-                                print(f"[AniMate] Joining areas with cursor at {cursor_pos}")
-
-                                # Use C-style override context
-                                with bpy.context.temp_override(window=window, screen=screen, area=area):
-                                    # Set the mouse cursor position
-                                    bpy.context.window.cursor_warp(cursor_pos[0], cursor_pos[1])
-                                    # Join the areas
-                                    bpy.ops.screen.area_join()
-
-                                # Count areas after joining
-                                areas_after = len([a for a in screen.areas if is_area_valid(a)])
-
-                                # Verify that the area was actually joined
-                                if areas_after < areas_before:
-                                    print(f"[AniMate] Successfully joined areas directly. Areas before: {areas_before}, after: {areas_after}")
+                                # Use the new join_areas_direct function
+                                success = join_areas_direct(window, screen, main_area, area)
+                                if success:
+                                    print(f"[AniMate] Successfully joined areas directly.")
                                 else:
-                                    print(f"[AniMate] Direct area join didn't decrease area count. Areas before: {areas_before}, after: {areas_after}")
+                                    print(f"[AniMate] Failed to join areas directly.")
                             except Exception as e:
                                 print(f"[AniMate] Direct join failed: {e}")
                 except Exception as e:
